@@ -42,7 +42,8 @@ function xHorizontal(id,num,title,lines,first,grid){
       ...P.map(i=>Nm(x[i]!=null&&x[i-1]!=null?x[i]-x[i-1]:null,0,st)),
       ...P.map(i=>Nm(x[i]!=null&&x[i-1]?x[i]/x[i-1]*100:null,2))];
   });
-  return {id,num,title,ncols,grid:widths(grid,ncols),sz:16,line:true,bsz:4,head,body};
+  // в образце у 2.3 строки не ниже 0,5 см (284 twips), у 2.2 — без ограничения
+  return {id,num,title,ncols,grid:widths(grid,ncols),sz:16,line:true,bsz:4,rowH:first==='Пассив'?284:null,head,body};
 }
 
 /* ---------- 2.4 / 2.5 Вертикальный анализ (8 пт, интервал 1,5) ---------- */
@@ -62,7 +63,7 @@ function xVertical(id,num,title,lines,first,totalCode,grid){
                         : P.map(i=>Nm(sh[i]!=null&&sh[i-1]!=null?sh[i]-sh[i-1]:null,2));
     return [C(l.n,st), ...x.flatMap((a,i)=>[Nm(a,0,st), Nm(sh[i],2)]), ...dev];
   });
-  return {id,num,title,ncols,grid:widths(grid,ncols),sz:16,line:true,bsz:4,head,body};
+  return {id,num,title,ncols,grid:widths(grid,ncols),sz:16,line:true,bsz:4,rowH:284,head,body};   // строки не ниже 0,5 см, как в образце
 }
 
 /* ---------- 2.6 ДЗ и КЗ (12 пт) ---------- */
