@@ -23,7 +23,7 @@ function tableHTML(t){
 let sampleFn = null, downloadsNs = null, imagesOk = false;
 function renderOut(){
   const tables = buildTables();
-  document.getElementById('toc').innerHTML = tables.map(t=>`<a href="#${t.id}">Таблица ${t.num}</a>`).join('');
+  document.getElementById('toc').innerHTML = tables.map(t=>`<a href="#${t.id}">Таблица ${t.num}</a>`).join('')+'<a href="#s4">Расчеты</a>';
   const out = document.getElementById('out');
   out.innerHTML = tables.map(t=>`
     <figure class="tbl" id="${t.id}">
@@ -38,6 +38,7 @@ function renderOut(){
         </div>
       </div>
     </figure>${chartFiguresHTML(t.id)}`).join('');
+  document.getElementById('calc').innerHTML = calcHTML();
   drawCharts();
 }
 

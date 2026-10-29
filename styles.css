@@ -116,3 +116,11 @@ figure.chart{margin:0 0 2.4rem}
 figure.chart .chartbox{position:relative;height:380px;background:var(--sheet);border:1px solid var(--rule);border-radius:8px;padding:10px}
 figure.chart figcaption{font-family:"PT Serif",Georgia,serif;font-size:1.05rem;margin:.5rem 0 0;text-align:center}
 @media (max-width:640px){figure.chart .chartbox{height:320px;padding:6px}}
+
+/* Раздел «Расчеты» */
+.calc{background:var(--sheet);border:1px solid var(--rule);border-radius:8px;padding:1rem 1.2rem;font-family:"PT Serif",Georgia,serif;font-size:1rem;line-height:1.55}
+.calc h3{font-size:1.05rem;margin:1.2rem 0 .4rem}
+.calc h3:first-of-type{margin-top:.6rem}
+.calc p{margin:.35rem 0}
+.calc p.f{margin:.1rem 0 .1rem 1.6rem;font-variant-numeric:tabular-nums}
+.calc sub{font-size:.72em}

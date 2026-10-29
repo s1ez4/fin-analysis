@@ -74,10 +74,15 @@ document.getElementById('dlTpl').onclick=async()=>{
 
 /* ---- Word (.docx) ---- */
 const xe=s=>String(s).replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
-function wRun(text,{b,sz=28,i}={}){ return `<w:r><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:cs="Times New Roman"/>${b?'<w:b/>':''}${i?'<w:i/>':''}<w:sz w:val="${sz}"/><w:szCs w:val="${sz}"/></w:rPr><w:t xml:space="preserve">${xe(text)}</w:t></w:r>`; }
-function wPara(text,{b,sz=28,jc='both',ind=true,after=120,keep}={}){
-  return `<w:p><w:pPr>${keep?'<w:keepNext/>':''}<w:spacing w:after="${after}" w:line="360" w:lineRule="auto"/>${ind?'<w:ind w:firstLine="709"/>':''}<w:jc w:val="${jc}"/></w:pPr>${wRun(text,{b,sz})}</w:p>`;
+// sub — подстрочный индекс (для «К₂₀₂₅» в разделе «Расчеты»)
+function wRun(text,{b,sz=28,i,sub}={}){ return `<w:r><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:cs="Times New Roman"/>${b?'<w:b/>':''}${i?'<w:i/>':''}${sub?'<w:vertAlign w:val="subscript"/>':''}<w:sz w:val="${sz}"/><w:szCs w:val="${sz}"/></w:rPr><w:t xml:space="preserve">${xe(text)}</w:t></w:r>`; }
+// pb — начать с новой страницы
+function wPPr({jc='both',ind=true,after=120,keep,pb}={}){
+  return `<w:pPr>${keep?'<w:keepNext/>':''}${pb?'<w:pageBreakBefore/>':''}<w:spacing w:after="${after}" w:line="360" w:lineRule="auto"/>${ind?'<w:ind w:firstLine="709"/>':''}<w:jc w:val="${jc}"/></w:pPr>`;
 }
+function wPara(text,{b,sz=28,...o}={}){ return `<w:p>${wPPr(o)}${wRun(text,{b,sz})}</w:p>`; }
+// абзац из нескольких кусков текста: runs = [{t, sub}]
+function wParaRuns(runs,{sz=28,...o}={}){ return `<w:p>${wPPr(o)}${runs.map(r=>wRun(r.t,{sz,sub:r.sub})).join('')}</w:p>`; }
 function wTable(t){
   const rows=allRows(t), grid=layout(rows,t.ncols), W=9355;
   const first=Math.round(W*(t.ncols>7?0.26:0.36)), other=Math.floor((W-first)/(t.ncols-1));
