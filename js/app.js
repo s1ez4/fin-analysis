@@ -39,7 +39,29 @@ function renderOut(){
       </div>
     </figure>${chartFiguresHTML(t.id)}`).join('');
   document.getElementById('calc').innerHTML = calcHTML();
+  renderKpis();
+  document.querySelectorAll("#out textarea").forEach(autosize);
   drawCharts();
+}
+
+/* ===================== Ключевые показатели в шапке ===================== */
+// Компактная сумма: тыс. руб. → «615,4 млрд руб.» / «12,3 млн руб.»
+const money = x => Math.abs(x)>=1e6 ? fmtNum(x/1e6,1)+' млрд руб.' : Math.abs(x)>=1e3 ? fmtNum(x/1e3,1)+' млн руб.' : fmtNum(x,0)+' тыс. руб.';
+function renderKpis(){
+  const box=document.getElementById('kpis');
+  const lastIdx = stmt => { const I=state.years.map((_,i)=>i).filter(i=>has(stmt,i)); return [I.at(-1), I.at(-2)]; };
+  // изменение к предыдущему году: «▲ 17,1% к 2024»
+  const delta = (code,z,p) => { if (p==null) return ''; const a=nz(v(code,p)), b=nz(v(code,z)); if (!a) return '';
+    const d=(b-a)/Math.abs(a)*100; return `<div class="d ${d>=0?'up':'down'}">${d>=0?'▲':'▼'} ${fmtNum(Math.abs(d),1)}% к ${Y(p)}</div>`; };
+  const card = (k,v,d='',cls='') => `<div class="kpi"><div class="k">${esc(k)}</div><div class="v ${cls}">${v}</div>${d}</div>`;
+  const [zb,pb]=lastIdx('bal'), [zp,pp]=lastIdx('pl'), parts=[];
+  if (zb!=null) parts.push(card(`Валюта баланса на 31.12.${Y(zb)}`, money(nz(v('1600',zb))), delta('1600',zb,pb)));
+  if (zp!=null){
+    parts.push(card(`Выручка за ${Y(zp)} г.`, money(nz(v('2110',zp))), delta('2110',zp,pp)));
+    parts.push(card(`Чистая прибыль за ${Y(zp)} г.`, money(nz(v('2400',zp))), delta('2400',zp,pp)));
+  }
+  if (zb!=null) parts.push(card('Тип финансовой устойчивости', esc(stabType(base(zb)).t), `<div class="d">трехмерная модель ${stabType(base(zb)).m}</div>`, 'txt'));
+  box.innerHTML=parts.join('');
 }
 
 /* ===================== Рендер: сетка ввода ===================== */
@@ -133,19 +155,21 @@ document.getElementById('revChart').addEventListener('change',e=>{ state.revChar
 document.getElementById('loadExample').onclick=()=>{ state=clone(EXAMPLE); document.getElementById('company').value=state.company; innIn.value=state.inn; updNalog(); refreshAll(); status('Загружен пример'); };
 document.getElementById('clearAll').onclick=()=>{ state=blank(); document.getElementById('company').value=''; innIn.value=''; updNalog(); refreshAll(); status('Данные очищены'); };
 
-document.getElementById('out').addEventListener('input',e=>{ const ta=e.target.closest('textarea[data-id]'); if(ta){ state.conclusions[ta.dataset.id]=ta.value; save(); }});
+// поле вывода растягивается по тексту, без внутренней прокрутки
+function autosize(ta){ ta.style.height='auto'; ta.style.height=(ta.scrollHeight+2)+'px'; }
+document.getElementById('out').addEventListener('input',e=>{ const ta=e.target.closest('textarea[data-id]'); if(ta){ state.conclusions[ta.dataset.id]=ta.value; autosize(ta); save(); }});
 // Шаблонный вывод (без ИИ): собирается по правилам из цифр таблицы — см. js/conclusions.js
 document.getElementById('out').addEventListener('click',e=>{
   const b=e.target.closest('button[data-auto]'); if(!b) return;
   const id=b.dataset.auto, ta=document.querySelector(`textarea[data-id="${id}"]`), st=document.querySelector(`[data-aist="${id}"]`);
   if(ta.value.trim() && !confirm('Заменить текущий вывод шаблонным?')) return;
-  ta.value=autoConclusion(id); state.conclusions[id]=ta.value; save();
+  ta.value=autoConclusion(id); state.conclusions[id]=ta.value; autosize(ta); save();
   st.textContent='Готово — проверьте и дополните своими словами.';
 });
 // Все пустые выводы сразу (уже написанные не трогаем)
 document.getElementById('autoAll').onclick=()=>{
   let k=0;
-  document.querySelectorAll('textarea[data-id]').forEach(ta=>{ if(ta.value.trim()) return; ta.value=autoConclusion(ta.dataset.id); state.conclusions[ta.dataset.id]=ta.value; k++; });
+  document.querySelectorAll('textarea[data-id]').forEach(ta=>{ if(ta.value.trim()) return; ta.value=autoConclusion(ta.dataset.id); state.conclusions[ta.dataset.id]=ta.value; autosize(ta); k++; });
   save(); status(k?`Заполнено выводов: ${k}`:'Все выводы уже заполнены');
 };
 

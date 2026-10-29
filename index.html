@@ -1,8 +1,10 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="ru" data-theme="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0e14">
+<meta name="color-scheme" content="dark">
 <title>Анализ бухгалтерской отчетности</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -12,12 +14,14 @@
 <body>
 <div class="page">
   <header class="top">
+    <span class="kicker">ФУиА · анализ отчетности за 2–5 лет</span>
     <h1>Анализ бухгалтерской отчетности</h1>
     <p>Загрузите баланс и отчет о финансовых результатах — сайт посчитает горизонтальный и вертикальный анализ, прибыль, ликвидность и финансовую устойчивость за все годы и соберет таблицы в Excel и Word.</p>
     <div class="company">
       <label for="company">Организация</label>
       <input id="company" type="text" placeholder="Например, ПАО «Нижнекамскнефтехим»" autocomplete="off">
     </div>
+    <div class="kpis" id="kpis" aria-label="Ключевые показатели за последний год"></div>
   </header>
 
   <div class="bar" role="toolbar" aria-label="Действия">
@@ -89,7 +93,7 @@
 
   <section class="step" id="s4">
     <h2><span class="n">4</span>Расчеты</h2>
-    <p class="lead">Формулы с подстановкой чисел для каждого коэффициента и года — этот раздел целиком попадает в Word после таблиц.</p>
+    <p class="lead">Формулы с подстановкой чисел для каждого коэффициента и года. В Word они стоят прямо перед таблицами 2.8, 2.9 и 2.10 — как в образце.</p>
     <div class="calc" id="calc"></div>
   </section>
 </div>

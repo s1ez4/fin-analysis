@@ -17,7 +17,7 @@ function yearColors(n, ramp){ return Array.from({length:n},(_,k)=> ramp[n===1?2:
 function chartTheme(forExport){
   if (forExport) return {mode:'light', surface:'#ffffff', ink:'#0b0b0b', soft:'#52514e', grid:'#e1e0d9', axis:'#c3c2b7', font:'"Times New Roman", Times, serif'};
   const cs=getComputedStyle(document.documentElement), g=k=>cs.getPropertyValue(k).trim();
-  return {mode: cs.colorScheme==='dark'?'dark':'light', surface:g('--sheet'), ink:g('--ink'), soft:g('--ink-soft'), grid:g('--rule'), axis:g('--rule-strong'), font:'"Golos Text", system-ui, sans-serif'};
+  return {mode: cs.colorScheme==='dark'?'dark':'light', surface:g('--sheet-2'), ink:g('--ink'), soft:g('--ink-soft'), grid:g('--rule'), axis:g('--rule-strong'), font:'"Golos Text", system-ui, sans-serif'};
 }
 
 /* ===================== Что рисуем ===================== */
