@@ -30,8 +30,9 @@ function renderOut(){
       <figcaption>Таблица ${t.num} – ${esc(t.title)}</figcaption>
       <div class="scroll">${tableHTML(t)}</div>
       <div class="concl">
-        <textarea data-id="${t.id}" placeholder="Вывод по таблице ${t.num} — напишите сами или нажмите «Черновик вывода»">${esc(state.conclusions[t.id]||'')}</textarea>
+        <textarea data-id="${t.id}" placeholder="Вывод по таблице ${t.num} — напишите сами или нажмите «Сгенерировать вывод»">${esc(state.conclusions[t.id]||'')}</textarea>
         <div class="row">
+          <button class="btn ghost small" data-auto="${t.id}">Сгенерировать вывод</button>
           <button class="btn ghost small ai-only" data-ai="${t.id}" ${sampleFn?'':'hidden'}>Черновик вывода от Claude</button>
           <small data-aist="${t.id}"></small>
         </div>
@@ -130,6 +131,20 @@ document.getElementById('loadExample').onclick=()=>{ state=clone(EXAMPLE); docum
 document.getElementById('clearAll').onclick=()=>{ state=blank(); document.getElementById('company').value=''; innIn.value=''; updNalog(); refreshAll(); status('Данные очищены'); };
 
 document.getElementById('out').addEventListener('input',e=>{ const ta=e.target.closest('textarea[data-id]'); if(ta){ state.conclusions[ta.dataset.id]=ta.value; save(); }});
+// Шаблонный вывод (без ИИ): собирается по правилам из цифр таблицы — см. js/conclusions.js
+document.getElementById('out').addEventListener('click',e=>{
+  const b=e.target.closest('button[data-auto]'); if(!b) return;
+  const id=b.dataset.auto, ta=document.querySelector(`textarea[data-id="${id}"]`), st=document.querySelector(`[data-aist="${id}"]`);
+  if(ta.value.trim() && !confirm('Заменить текущий вывод шаблонным?')) return;
+  ta.value=autoConclusion(id); state.conclusions[id]=ta.value; save();
+  st.textContent='Готово — проверьте и дополните своими словами.';
+});
+// Все пустые выводы сразу (уже написанные не трогаем)
+document.getElementById('autoAll').onclick=()=>{
+  let k=0;
+  document.querySelectorAll('textarea[data-id]').forEach(ta=>{ if(ta.value.trim()) return; ta.value=autoConclusion(ta.dataset.id); state.conclusions[ta.dataset.id]=ta.value; k++; });
+  save(); status(k?`Заполнено выводов: ${k}`:'Все выводы уже заполнены');
+};
 
 let stT; function status(s){ const el=document.getElementById('status'); el.textContent=s; clearTimeout(stT); stT=setTimeout(()=>el.textContent='',4000); }
 function msg(s,err){ const el=document.getElementById('msg'); el.textContent=s||''; el.classList.toggle('err',!!err); }

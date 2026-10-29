@@ -47,6 +47,32 @@ function stabType(b){
   return {m:'('+m.join(', ')+')', t};
 }
 
+// Число по-русски: пробелы между разрядами, запятая, длинный минус «−»; d — знаков после запятой
+const fmtNum=(x,d=0)=>{ const s=x.toLocaleString('ru-RU',{minimumFractionDigits:d,maximumFractionDigits:d}); return /^-[0,\s ]*$/.test(s)?s.slice(1):s.replace('-','−'); };
+
+// Сравнение коэффициента с нормативом из LIQ/FIN («0,15–0,2», «≥ 0,5», «≤ 0,67», «индивидуально»).
+// Сравниваем уже округленное значение (d знаков) — как оно показано в таблице.
+// Возвращает {ok, text} или null, если норматива нет.
+function normCheck(x, norm, d=2){
+  if (x==null || !Number.isFinite(x)) return null;
+  const num = s => parseFloat(s.replace(',','.'));
+  const r = Math.round(x*10**d)/10**d;
+  let m;
+  if ((m = norm.match(/^([\d,]+)\s*[–-]\s*([\d,]+)$/))){
+    const lo=num(m[1]), hi=num(m[2]);
+    if (r<lo) return {ok:false, text:`ниже рекомендуемого интервала ${norm}`};
+    if (r>hi) return {ok:false, text:`выше рекомендуемого интервала ${norm}`};
+    return {ok:true, text:`находится в пределах рекомендуемого интервала ${norm}`};
+  }
+  if ((m = norm.match(/^≥\s*([\d,]+)$/))){
+    return r<num(m[1]) ? {ok:false, text:`ниже рекомендуемого значения ${m[1]}`} : {ok:true, text:`не ниже рекомендуемого значения ${m[1]}`};
+  }
+  if ((m = norm.match(/^≤\s*([\d,]+)$/))){
+    return r>num(m[1]) ? {ok:false, text:`выше рекомендуемого значения ${m[1]}`} : {ok:true, text:`не выше рекомендуемого значения ${m[1]}`};
+  }
+  return null; // «индивидуально» — норматива нет
+}
+
 /* ===================== Модель таблиц ===================== */
 // ячейка: {t:текст} | {v:число,k:'num'|'pct'|'r',d:знаки}; заголовки: {t,cs,rs}
 const N = (val,k='num',d=0)=>({v:val,k,d});

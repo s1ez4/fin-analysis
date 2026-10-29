@@ -23,7 +23,6 @@ function chartTheme(forExport){
 /* ===================== Что рисуем ===================== */
 // Каждый рисунок: номер, после какой таблицы стоит, вид и серии.
 // kind: 'stack100' — структура в % (столбики 100%), 'bars' — суммы по годам, 'ratios' — коэффициенты по годам
-const fmtNum=(x,d=0)=>{ const s=x.toLocaleString('ru-RU',{minimumFractionDigits:d,maximumFractionDigits:d}); return /^-[0,\s ]*$/.test(s)?s.slice(1):s.replace('-','−'); };
 const cap = s => s[0].toUpperCase()+s.slice(1);
 function chartDefs(){
   const hv=yearsHas('bal'), hp=yearsHas('pl');
