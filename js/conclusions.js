@@ -222,12 +222,109 @@ function conclGroups(){
   return s.join(' ');
 }
 
-/* ===================== Таблица → функция вывода ===================== */
+/* ===================== Выводы к рисункам ===================== */
+const figNum = id => (chartDefs().find(d=>d.id===id)||{}).num || '';
+const andList = a => a.length>1 ? a.slice(0,-1).join(', ')+' и '+a.at(-1) : (a[0]||'');
+// «увеличились на … (на …%)» или «не изменились»
+const vh = (a,b,g) => [verb(b-a,g), byHow(a,b)].filter(Boolean).join(' ');
+// «77,6%, 78,4% и 82,7% на 31.12.2023, 31.12.2024 и 31.12.2025 соответственно»
+// byYear — для показателей ОФР: «… в 2023, 2024 и 2025 гг. соответственно»
+function seq(I, f, byYear){
+  if (byYear) return I.length===1 ? `${f(I[0])} в ${Y(I[0])} г.` : `${andList(I.map(f))} в ${andList(I.map(Y))} гг. соответственно`;
+  if (I.length===1) return `${f(I[0])} на ${dt(I[0])}`;
+  return `${andList(I.map(f))} на ${andList(I.map(dt))} соответственно`;
+}
+// «вырос коэффициент X» / «выросли коэффициенты X и Y»
+const coefs = (a, one, many) => a.length===1 ? `${one} коэффициент ${a[0]}` : `${many} коэффициенты ${andList(a)}`;
+
+function conclFigAssets(){
+  const I=idxWith('bal'); if (!I.length) return NEED1;
+  const a=I[0], z=I.at(-1), s=[], voa=i=>nz(v('1100',i)), oa=i=>nz(v('1200',i));
+  const allMore=I.every(i=>voa(i)>oa(i));
+  s.push(`Из рисунка ${figNum('fA')} видно, что ${allMore?'на протяжении всего периода внеоборотные активы значительно превышают оборотные':'соотношение внеоборотных и оборотных активов меняется'}: на ${dt(z)} — ${tr(voa(z))} против ${tr(oa(z))}.`);
+  if (a!==z){
+    s.push(`За ${yrs(a,z)} внеоборотные активы ${vh(voa(a),voa(z),'p')}, оборотные — ${vh(oa(a),oa(z),'p')}.`);
+    if (I.length>2) s.push(`По годам внеоборотные активы изменялись так: ${byYears('1100',I)}; оборотные: ${byYears('1200',I)}.`);
+  }
+  return s.join(' ');
+}
+function conclFigLiab(){
+  const I=idxWith('bal'); if (!I.length) return NEED1;
+  const a=I[0], z=I.at(-1), s=[], g=(c,i)=>nz(v(c,i));
+  const parts=[['собственный капитал','1300','m'],['долгосрочные обязательства','1400','p'],['краткосрочные обязательства','1500','p']];
+  const top=parts.map(p=>({p, x:g(p[1],z)})).sort((x,y)=>y.x-x.x)[0];
+  s.push(`Из рисунка ${figNum('fP')} видно, что на ${dt(z)} наибольшую часть пассива составляет ${top.p[0]} — ${tr(top.x)}.`);
+  if (a!==z) s.push(`За ${yrs(a,z)} ${parts.map(([n,c,gn])=>`${n} ${vh(g(c,a),g(c,z),gn)}`).join(', ')}.`);
+  const zk=g('1400',z)+g('1500',z), sk=g('1300',z);
+  s.push(zk>sk
+    ? `Заемный капитал (${tr(zk)}) превышает собственный (${tr(sk)}), то есть деятельность организации в большей степени финансируется за счет заемных средств.`
+    : `Собственный капитал (${tr(sk)}) превышает заемный (${tr(zk)}), то есть деятельность организации финансируется преимущественно за счет собственных средств.`);
+  return s.join(' ');
+}
+function conclFigShares(kind){
+  const I=idxWith('bal'); if (!I.length) return NEED1;
+  const z=I.at(-1), s=[], tot=kind==='asset'?'1600':'1700';
+  const sh=(c,i)=>{ const x=div(nz(v(c,i)),nz(v(tot,i))); return x==null?0:x*100; };
+  const fmtSh=c=>i=>pc(sh(c,i));
+  if (kind==='asset'){
+    s.push(`На рисунке ${figNum('fAs')} видно, что доля внеоборотных активов составила ${seq(I,fmtSh('1100'))}, доля оборотных активов — ${seq(I,fmtSh('1200'))}.`);
+    const cur=['1210','1230','1240','1250','1260'].map(c=>({l:BYCODE[c], x:sh(c,z)})).sort((p,q)=>q.x-p.x)[0];
+    if (cur && cur.x>0) s.push(`Среди оборотных активов наибольшую долю на ${dt(z)} занимает статья «${cur.l.n}» — ${pc(cur.x)} валюты баланса.`);
+    if (I.length>1){ const d=sh('1100',z)-sh('1100',I[0]); s.push(Math.abs(d)<0.05 ? 'Структура активов за период существенно не изменилась.' : `Доля внеоборотных активов за период ${d>0?'выросла':'снизилась'} на ${fmtNum(Math.abs(d),2)} п. п., ${d>0?'мобильность имущества снижается':'мобильность имущества повышается'}.`); }
+  } else {
+    s.push(`На рисунке ${figNum('fPs')} видно, что доля собственного капитала составила ${seq(I,fmtSh('1300'))}, долгосрочных обязательств — ${seq(I,fmtSh('1400'))}, краткосрочных обязательств — ${seq(I,fmtSh('1500'))}.`);
+    const zk=sh('1400',z)+sh('1500',z);
+    s.push(zk>50 ? `На ${dt(z)} заемные средства формируют ${pc(zk)} пассива, что говорит о зависимости организации от внешних источников финансирования.`
+                 : `На ${dt(z)} заемные средства формируют лишь ${pc(zk)} пассива, основная часть имущества финансируется собственным капиталом.`);
+  }
+  return s.join(' ');
+}
+function conclFigRevenue(){
+  const I=idxWith('pl'); if (!I.length) return NEED1;
+  const s=[], g=(c,i)=>nz(v(c,i));
+  s.push(`Из рисунка ${figNum('fRev')} видно, что выручка составила ${seq(I,i=>tr(g('2110',i)),true)}.`);
+  const best=I.reduce((p,i)=>g('2110',i)>g('2110',p)?i:p, I[0]);
+  if (I.length>1) s.push(`Наибольшая выручка получена в ${Y(best)} г.`);
+  s.push(`Чистая прибыль составила ${seq(I,i=>tr(g('2400',i)),true)}; рентабельность по чистой прибыли (чистая прибыль / выручка) — ${seq(I,i=>{ const r=div(g('2400',i),g('2110',i)); return r==null?'—':pc(r*100); },true)}.`);
+  if (I.length>1){ const a=I[0], z=I.at(-1), pr=gp(g('2110',a),g('2110',z)), pn=gp(g('2400',a),g('2400',z));
+    if (pr!=null && pn!=null) s.push(pn<pr ? 'Прибыль растет медленнее выручки (или снижается), то есть эффективность деятельности падает из-за роста расходов.' : 'Прибыль растет быстрее выручки, эффективность деятельности повышается.'); }
+  return s.join(' ');
+}
+// Как изменились коэффициенты по годам. good: 1 — рост хорош, −1 — рост плох, 0 — нейтрально
+const FIN_GOOD={'финансовой независимости':1,'финансовой напряженности':-1,'самофинансирования':1,'задолженности':-1,
+  'обеспеченности собственными оборотными средствами':1,'маневренности собственных оборотных средств':1,
+  'соотношения мобильных и иммобилизованных активов':0,'имущества производственного назначения':1};
+function conclFigRatios(defs, kind){
+  const I=idxWith('bal'); if (!I.length) return NEED1;
+  const s=[], z=I.at(-1), id=kind==='liq'?'fLiq':'fFin';
+  const val=(fn,d,i)=>{ const x=fn(base(i)); return x==null?null:Math.round(x*10**d)/10**d; };
+  if (I.length===1) s.push(`На рисунке ${figNum(id)} показаны значения коэффициентов на ${dt(z)}.`);
+  for (let k=1;k<I.length;k++){
+    const p=I[k-1], c=I[k], up=[], down=[], good=[], bad=[];
+    for (const [name,,fn,d] of defs){
+      const a=val(fn,d,p), b=val(fn,d,c); if (a==null||b==null||a===b) continue;
+      if (kind==='liq') (b>a?up:down).push(name);
+      else { const g=FIN_GOOD[name]; if (!g) continue; ((b-a)*g>0?good:bad).push(name); }
+    }
+    const lead = k===1 ? `Из рисунка ${figNum(id)} видно, что в ${Y(c)} году по сравнению с ${Y(p)} годом` : `В ${Y(c)} году по сравнению с ${Y(p)} годом`;
+    if (kind==='liq') s.push(`${lead} ${up.length?coefs(up,'вырос','выросли'):'ни один коэффициент не вырос'}${down.length?`, ${down.length===1?'снизился':'снизились'} — ${andList(down)}`:''}.`);
+    else s.push(`${lead} ${good.length?coefs(good,'улучшился','улучшились'):'ни один коэффициент не улучшился'}${bad.length?`, ${bad.length===1?'ухудшился':'ухудшились'} — ${andList(bad)}`:''}.`);
+  }
+  const ok=defs.filter(([,norm,fn,d])=>{ const c=normCheck(fn(base(z)),norm,d); return c&&c.ok; }).length, withNorm=defs.filter(([,norm])=>norm!=='индивидуально').length;
+  if (kind==='liq') s.push(ok===0 ? `На ${dt(z)} ни один из коэффициентов ликвидности не достигает рекомендуемых значений, что говорит о недостаточной платежеспособности.` : `На ${dt(z)} рекомендуемым значениям соответствуют ${ok} из ${withNorm} коэффициентов ликвидности.`);
+  else s.push(`На ${dt(z)} рекомендуемым значениям соответствуют ${ok} из ${withNorm} показателей финансовой устойчивости${ok<=withNorm/2?', большинство показателей находится вне оптимального диапазона, что подтверждает преобладание заемных средств над собственными':''}.`);
+  return s.join(' ');
+}
+
+/* ===================== Таблица / рисунок → функция вывода ===================== */
 const AUTO_CONCL={
+  fA:conclFigAssets, fP:conclFigLiab, fAs:()=>conclFigShares('asset'), fPs:()=>conclFigShares('liab'),
+  fRev:conclFigRevenue, fLiq:()=>conclFigRatios(LIQ,'liq'), fFin:()=>conclFigRatios(FIN,'fin'),
   t22:conclAssetH, t23:conclLiabH,
   t24:()=>conclVert('asset'), t25:()=>conclVert('liab'),
   t26:conclDebt, t27:conclProfit,
   t28:()=>conclRatios(LIQ,'liq'), t29:()=>conclRatios(FIN,'fin'),
   t210:conclStability, t211:conclGroups,
 };
-function autoConclusion(id){ const fn=AUTO_CONCL[id]; return fn ? fn() : ''; }
+// «тыс. руб..» → «тыс. руб.»: сокращение в конце предложения не дает двух точек
+function autoConclusion(id){ const fn=AUTO_CONCL[id]; return fn ? fn().replace(/\.\.(?!\.)/g,'.') : ''; }

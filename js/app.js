@@ -128,6 +128,8 @@ document.getElementById('delYear').onclick=()=>{
 };
 document.getElementById('company').addEventListener('input',e=>{ state.company=e.target.value; save(); });
 document.getElementById('hideZero').addEventListener('change',renderOut);
+// рисунок выручки и прибыли: в образце его нет, поэтому его можно выключить (номера рисунков пересчитаются)
+document.getElementById('revChart').addEventListener('change',e=>{ state.revChart=e.target.checked; renderOut(); save(); });
 document.getElementById('loadExample').onclick=()=>{ state=clone(EXAMPLE); document.getElementById('company').value=state.company; innIn.value=state.inn; updNalog(); refreshAll(); status('Загружен пример'); };
 document.getElementById('clearAll').onclick=()=>{ state=blank(); document.getElementById('company').value=''; innIn.value=''; updNalog(); refreshAll(); status('Данные очищены'); };
 
@@ -320,6 +322,7 @@ document.getElementById('company').addEventListener('input',updNalog);
 state=load();
 document.getElementById('company').value=state.company||'';
 innIn.value=state.inn||''; updNalog();
+document.getElementById('revChart').checked = state.revChart!==false;
 refreshAll();
 (async()=>{
   if(!window.claude||!window.claude.use) { renderThumbs(); return; }

@@ -80,6 +80,7 @@
     <p class="lead">Нумерация и формулы — как в задании. Под каждой таблицей можно написать вывод вручную, собрать шаблонный вывод по цифрам кнопкой «Сгенерировать вывод» или попросить черновик у Claude — выводы тоже попадут в Word.</p>
     <div class="opts">
       <label><input type="checkbox" id="hideZero" checked> Скрывать пустые строки</label>
+      <label title="В образце такого рисунка нет: если выключить, номера рисунков совпадут с образцом (2.6 и 2.7)"><input type="checkbox" id="revChart" checked> Рисунок «Динамика выручки и прибыли»</label>
       <button class="btn ghost small" id="autoAll">Заполнить пустые выводы шаблоном</button>
     </div>
     <nav class="toc" id="toc" aria-label="Список таблиц"></nav>
@@ -98,6 +99,7 @@
 <script src="js/charts.js"></script>
 <script src="js/conclusions.js"></script>
 <script src="js/formulas.js"></script>
+<script src="js/docstyle.js"></script>
 <script src="js/export.js"></script>
 <script src="js/app.js"></script>
 </body>

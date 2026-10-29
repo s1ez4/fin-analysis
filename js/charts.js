@@ -21,34 +21,45 @@ function chartTheme(forExport){
 }
 
 /* ===================== Что рисуем ===================== */
-// Каждый рисунок: номер, после какой таблицы стоит, вид и серии.
+// Рисунки стоят как в образце: 2.2–2.3 — после горизонтального анализа, 2.4–2.5 «Доля активов/пассивов» —
+// после вертикального, затем ликвидность и финансовая устойчивость. Рисунок выручки и прибыли в образце
+// нет — его можно выключить галочкой, тогда номера совпадут с образцом (2.6 и 2.7). Номера ставятся по порядку.
 // kind: 'stack100' — структура в % (столбики 100%), 'bars' — суммы по годам, 'ratios' — коэффициенты по годам
 const cap = s => s[0].toUpperCase()+s.slice(1);
 function chartDefs(){
   const hv=yearsHas('bal'), hp=yearsHas('pl');
   const yb=state.years.map((_,i)=>i).filter(i=>hv[i]), yp=state.years.map((_,i)=>i).filter(i=>hp[i]);
-  const g=(c,i)=>nz(v(c,i));
-  return [
-    {id:'f22',num:'2.2',after:'t24',title:'Динамика структуры актива баланса, %',kind:'stack100',idx:yb,total:b=>b.VB,series:[
+  const g=(c,i)=>nz(v(c,i)), per=I=>I.length?` за ${Y(I[0])}-${Y(I.at(-1))} гг.`:'';
+  const defs=[
+    {id:'fA',after:'t22',title:'Динамика структуры актива баланса'+per(yb),kind:'bars',unit:'млн руб.',idx:yb,series:[
+      ['Внеоборотные активы',i=>v('1100',i)],
+      ['Оборотные активы',i=>v('1200',i)]]},
+    {id:'fP',after:'t23',title:'Динамика структуры пассива баланса'+per(yb),kind:'bars',unit:'млн руб.',idx:yb,series:[
+      ['Собственный капитал',i=>v('1300',i)],
+      ['Долгосрочные обязательства',i=>v('1400',i)],
+      ['Краткосрочные обязательства',i=>v('1500',i)]]},
+    {id:'fAs',after:'t24',title:'Доля активов баланса'+per(yb),kind:'stack100',idx:yb,total:b=>b.VB,series:[
       ['Внеоборотные активы',b=>b.VOA],
       ['Запасы',b=>b.Z],
       ['Дебиторская задолженность',b=>b.DZ],
       ['Денежные средства и финансовые вложения',b=>b.DS+b.KFV],
       ['Прочие оборотные активы',b=>b.OA-b.Z-b.DZ-b.DS-b.KFV]]},
-    {id:'f23',num:'2.3',after:'t25',title:'Динамика структуры пассива баланса, %',kind:'stack100',idx:yb,total:b=>b.VB,series:[
+    {id:'fPs',after:'t25',title:'Доля пассивов баланса'+per(yb),kind:'stack100',idx:yb,total:b=>b.VB,series:[
       ['Собственный капитал',b=>b.SK],
       ['Долгосрочные обязательства',b=>b.DO],
       ['Краткосрочные заемные средства',b=>b.KKZ],
       ['Кредиторская задолженность',(b,i)=>g('1520',i)],
       ['Прочие краткосрочные обязательства',(b,i)=>b.KO-b.KKZ-g('1520',i)]]},
-    {id:'f24',num:'2.4',after:'t27',title:'Динамика выручки и прибыли, млн руб.',kind:'bars',idx:yp,series:[
+    {id:'fRev',after:'t27',title:'Динамика выручки и прибыли'+per(yp),kind:'bars',unit:'млн руб.',idx:yp,series:[
       ['Выручка',i=>v('2110',i)],
       ['Валовая прибыль',i=>v('2100',i)],
       ['Прибыль от продаж',i=>v('2200',i)],
       ['Чистая прибыль',i=>v('2400',i)]]},
-    {id:'f26',num:'2.6',after:'t28',title:'Динамика коэффициентов ликвидности',kind:'ratios',idx:yb,defs:LIQ},
-    {id:'f27',num:'2.7',after:'t29',title:'Динамика коэффициентов финансовой устойчивости',kind:'ratios',idx:yb,defs:FIN},
-  ];
+    {id:'fLiq',after:'t28',title:'Динамика коэффициентов ликвидности',kind:'ratios',idx:yb,defs:LIQ},
+    {id:'fFin',after:'t29',title:'Изменения коэффициентов финансовой устойчивости',kind:'ratios',idx:yb,defs:FIN},
+  ].filter(d=>d.idx.length && (d.id!=='fRev' || state.revChart!==false));
+  defs.forEach((d,k)=>d.num='2.'+(k+2));   // сквозная нумерация: 2.2, 2.3, …
+  return defs;
 }
 
 // длинную подпись по оси X режем на строки примерно по 16 символов
@@ -130,7 +141,8 @@ function chartConfig(d, th, forExport){
       categoryPercentage:.78, barPercentage:.92,
       scales:{
         x:{stacked, grid:{display:false}, border:{color:th.axis}, ticks:{color:th.soft, font:xFont, autoSkip:false, maxRotation:0}},
-        y:{stacked, max:yMax, beginAtZero:true, grid:{color:th.grid}, border:{display:false}, ticks:{color:th.soft, font, callback:yTicks}},
+        y:{stacked, max:yMax, beginAtZero:true, grid:{color:th.grid}, border:{display:false}, ticks:{color:th.soft, font, callback:yTicks},
+           title:{display:!!d.unit, text:d.unit||'', color:th.soft, font}},   // единицы измерения у оси (млн руб.)
       },
       plugins:{
         bgFill:{color:th.surface},
@@ -152,6 +164,13 @@ function chartFiguresHTML(tableId){
     <figure class="chart" id="${d.id}">
       <div class="chartbox"><canvas role="img" aria-label="Рисунок ${d.num} – ${esc(d.title)}"></canvas></div>
       <figcaption>Рисунок ${d.num} – ${esc(d.title)}</figcaption>
+      <div class="concl">
+        <textarea data-id="${d.id}" placeholder="Вывод по рисунку ${d.num} — напишите сами или нажмите «Сгенерировать вывод»">${esc(state.conclusions[d.id]||'')}</textarea>
+        <div class="row">
+          <button class="btn ghost small" data-auto="${d.id}">Сгенерировать вывод</button>
+          <small data-aist="${d.id}"></small>
+        </div>
+      </div>
     </figure>`).join('');
 }
 async function drawCharts(){
