@@ -36,7 +36,8 @@ function renderOut(){
           <small data-aist="${t.id}"></small>
         </div>
       </div>
-    </figure>`).join('');
+    </figure>${chartFiguresHTML(t.id)}`).join('');
+  drawCharts();
 }
 
 /* ===================== Рендер: сетка ввода ===================== */

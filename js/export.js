@@ -97,32 +97,60 @@ function wTable(t){
       const isNum=cell.v!==undefined, bold=cell.hd||cell.sec||cell.tt;
       const jc=cell.hd?'center':(isNum||(c>0&&!cell.sec))?'center':'left';
       const shade=cell.hd||cell.sec?'<w:shd w:val="clear" w:color="auto" w:fill="EDEDED"/>':'';
-      x+=`<w:tc><w:tcPr><w:tcW w:w="${w}" w:type="dxa"/>${gs}${vm}${shade}<w:vAlign w:val="center"/></w:tcPr><w:p><w:pPr><w:spacing w:after="0" w:line="240" w:lineRule="auto"/><w:jc w:val="${jc}"/></w:pPr>${wRun(fmt(cell),{b:bold,sz:t.ncols>7?18:20})}</w:p></w:tc>`;
+      x+=`<w:tc><w:tcPr><w:tcW w:w="${w}" w:type="dxa"/>${gs}${vm}${shade}<w:vAlign w:val="center"/></w:tcPr><w:p><w:pPr><w:spacing w:after="0" w:line="240" w:lineRule="auto"/><w:jc w:val="${jc}"/></w:pPr>${wRun(fmt(cell),{b:bold,sz:t.ncols>8?16:t.ncols>7?18:20})}</w:p></w:tc>`;
       c+=cs;
     }
     x+='</w:tr>';
   });
   return x+'</w:tbl>';
 }
-document.getElementById('dlDocx').onclick=async()=>{
-  try{
-    await loadScript(JSZIP_URL);
-    const tables=buildTables();
-    let body=wPara(`Анализ бухгалтерской отчетности ${state.company||''}`.trim(),{b:true,jc:'center',ind:false,sz:32,after:240});
-    for(const t of tables){
-      body+=wPara(`Таблица ${t.num} – ${t.title}`,{ind:false,jc:'left',keep:true,after:60});
-      body+=wTable(t);
-      body+=wPara('',{after:60,ind:false});
-      const c=state.conclusions[t.id];
-      if(c) for(const p of c.split(/\n+/).filter(Boolean)) body+=wPara(p);
-      body+=wPara('',{after:120,ind:false});
+// Картинка в тексте (DrawingML inline). Размер в EMU: 1 см = 360 000 EMU; ширина 16 см, высота 8 см (как у PNG 2:1)
+function wImage(rid, n, name){
+  const cx=16*360000, cy=8*360000;
+  return `<w:p><w:pPr><w:keepNext/><w:spacing w:before="120" w:after="0"/><w:jc w:val="center"/></w:pPr><w:r><w:drawing>`+
+    `<wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:docPr id="${n}" name="${xe(name)}"/>`+
+    `<wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></wp:cNvGraphicFramePr>`+
+    `<a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic>`+
+    `<pic:nvPicPr><pic:cNvPr id="${n}" name="${xe(name)}"/><pic:cNvPicPr/></pic:nvPicPr>`+
+    `<pic:blipFill><a:blip r:embed="${rid}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>`+
+    `<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr>`+
+    `</pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>`;
+}
+// Собирает .docx и возвращает Blob (отдельно от кнопки — удобно проверять)
+async function buildDocx(){
+  await loadScript(JSZIP_URL);
+  const tables=buildTables();
+  // графики: если Chart.js не загрузился (нет интернета), документ соберется без рисунков
+  let images=[];
+  try{ images=await chartImages(); }catch(e){ status('Рисунки не добавлены: не загрузился Chart.js'); }
+  const zip=new JSZip(), rels=[];
+  let body=wPara(`Анализ бухгалтерской отчетности ${state.company||''}`.trim(),{b:true,jc:'center',ind:false,sz:32,after:240});
+  for(const t of tables){
+    body+=wPara(`Таблица ${t.num} – ${t.title}`,{ind:false,jc:'left',keep:true,after:60});
+    body+=wTable(t);
+    body+=wPara('',{after:60,ind:false});
+    const c=state.conclusions[t.id];
+    if(c) for(const p of c.split(/\n+/).filter(Boolean)) body+=wPara(p);
+    // рисунки, которые относятся к этой таблице: PNG в word/media, связь rIdN в document.xml.rels
+    for(const im of images.filter(x=>x.after===t.id)){
+      const n=rels.length+1, rid='rIdImg'+n, file=`media/chart${n}.png`;
+      zip.file('word/'+file, im.png);
+      rels.push(`<Relationship Id="${rid}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="${file}"/>`);
+      body+=wImage(rid, n, `Рисунок ${im.num}`);
+      body+=wPara(`Рисунок ${im.num} – ${im.title}`,{ind:false,jc:'center',after:240});
     }
-    const doc=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${body}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1134" w:right="850" w:bottom="1134" w:left="1701" w:header="708" w:footer="708" w:gutter="0"/></w:sectPr></w:body></w:document>`;
-    const zip=new JSZip();
-    zip.file('[Content_Types].xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>');
-    zip.file('_rels/.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>');
-    zip.file('word/document.xml',doc);
-    const blob=await zip.generateAsync({type:'blob'});
-    await offer(`Анализ_${fileBase()}.docx`, blob);
-  }catch(e){ msg('Ошибка при сборке Word: '+e.message,true); }
+    body+=wPara('',{after:120,ind:false});
+  }
+  if(typeof calcSectionXml==='function') body+=calcSectionXml();
+  const ns='xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"';
+  const doc=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document ${ns}><w:body>${body}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1134" w:right="850" w:bottom="1134" w:left="1701" w:header="708" w:footer="708" w:gutter="0"/></w:sectPr></w:body></w:document>`;
+  zip.file('[Content_Types].xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>');
+  zip.file('_rels/.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>');
+  zip.file('word/_rels/document.xml.rels',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${rels.join('')}</Relationships>`);
+  zip.file('word/document.xml',doc);
+  return zip.generateAsync({type:'blob'});
+}
+document.getElementById('dlDocx').onclick=async()=>{
+  try{ status('Собираю Word…'); await offer(`Анализ_${fileBase()}.docx`, await buildDocx()); }
+  catch(e){ msg('Ошибка при сборке Word: '+e.message,true); }
 };

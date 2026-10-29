@@ -110,3 +110,9 @@ figure.tbl .scroll{border-radius:8px}
 .opts label{display:flex;gap:.4rem;align-items:center;cursor:pointer}
 .visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 @media (prefers-reduced-motion:no-preference){.thumb{transition:border-color .15s}}
+
+/* Рисунки (графики) */
+figure.chart{margin:0 0 2.4rem}
+figure.chart .chartbox{position:relative;height:380px;background:var(--sheet);border:1px solid var(--rule);border-radius:8px;padding:10px}
+figure.chart figcaption{font-family:"PT Serif",Georgia,serif;font-size:1.05rem;margin:.5rem 0 0;text-align:center}
+@media (max-width:640px){figure.chart .chartbox{height:320px;padding:6px}}
