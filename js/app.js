@@ -58,7 +58,12 @@ function renderKpis(){
   if (zb!=null) parts.push(card(`Валюта баланса на 31.12.${Y(zb)}`, money(nz(v('1600',zb))), delta('1600',zb,pb)));
   if (zp!=null){
     parts.push(card(`Выручка за ${Y(zp)} г.`, money(nz(v('2110',zp))), delta('2110',zp,pp)));
-    parts.push(card(`Чистая прибыль за ${Y(zp)} г.`, money(nz(v('2400',zp))), delta('2400',zp,pp)));
+    const np=nz(v('2400',zp)), npPrev=pp!=null?nz(v('2400',pp)):null;
+    if (np<0 && npPrev!=null && npPrev<0){
+      // убыток два года подряд: показываем размер убытка и сократился он или вырос
+      const d=(-np-(-npPrev))/(-npPrev)*100;
+      parts.push(card(`Чистый убыток за ${Y(zp)} г.`, money(-np), `<div class="d ${d<=0?'up':'down'}">убыток ${d<=0?'сократился':'вырос'} на ${fmtNum(Math.abs(d),1)}% к ${Y(pp)}</div>`));
+    } else parts.push(card(`${np<0?'Чистый убыток':'Чистая прибыль'} за ${Y(zp)} г.`, money(Math.abs(np)), np<0?'':delta('2400',zp,pp)));
   }
   if (zb!=null) parts.push(card('Тип финансовой устойчивости', esc(stabType(base(zb)).t), `<div class="d">трехмерная модель ${stabType(base(zb)).m}</div>`, 'txt'));
   box.innerHTML=parts.join('');
@@ -152,7 +157,8 @@ document.getElementById('company').addEventListener('input',e=>{ state.company=e
 document.getElementById('hideZero').addEventListener('change',renderOut);
 // рисунок выручки и прибыли: в образце его нет, поэтому его можно выключить (номера рисунков пересчитаются)
 document.getElementById('revChart').addEventListener('change',e=>{ state.revChart=e.target.checked; renderOut(); save(); });
-document.getElementById('loadExample').onclick=()=>{ state=clone(EXAMPLE); document.getElementById('company').value=state.company; innIn.value=state.inn; updNalog(); refreshAll(); status('Загружен пример'); };
+// Кнопки примеров: data-example — номер в EXAMPLES (0 — НКНХ, 1 — Россети Северный Кавказ)
+document.querySelectorAll('[data-example]').forEach(b=>b.onclick=()=>{ state=clone(EXAMPLES[+b.dataset.example]); document.getElementById('company').value=state.company; innIn.value=state.inn; updNalog(); refreshAll(); status('Загружен пример: '+state.company); });
 document.getElementById('clearAll').onclick=()=>{ state=blank(); document.getElementById('company').value=''; innIn.value=''; updNalog(); refreshAll(); status('Данные очищены'); };
 
 // поле вывода растягивается по тексту, без внутренней прокрутки
@@ -205,7 +211,7 @@ function applyImport(years, vals, company){
     });
   }
   state.years=all; state.values=nv;
-  if(company && (!state.company || state.company===EXAMPLE.company)){ state.company=company; document.getElementById('company').value=company; }
+  if(company && (!state.company || EXAMPLES.some(e=>e.company===state.company))){ state.company=company; document.getElementById('company').value=company; }
   refreshAll();
 }
 

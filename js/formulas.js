@@ -46,7 +46,7 @@ function calcBlocks(part){
       I.forEach((i,k)=>{
         const b=base(i), x=fn(b);
         if (x==null){ B.push({f:[R('К'),R(Y(i),true),R(' — не рассчитывается (знаменатель равен нулю)'+end(k,I.length))]}); return; }
-        const chk=normCheck(x,norm,d);
+        const chk=ratioCheck(name,fn,norm,d,b);
         B.push({f:[R('К'),R(Y(i),true),R(` = ${grp(F.num(b))} / ${grp(F.den(b))} = ${fx(x,d)}${chk?` (${chk.text})`:''}${end(k,I.length)}`)]});
       });
     }

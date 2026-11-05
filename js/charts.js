@@ -107,10 +107,14 @@ function chartConfig(d, th, forExport){
   const pal=PALETTE[th.mode], labels=d.idx.map(i=>String(Y(i))), font={family:th.font, size:forExport?14:12};
   let datasets, xLabels=labels, valueLabels, yTicks, stacked=false, yMax, xFont=font;
   if(d.kind==='stack100'){
-    stacked=true; yMax=100;
+    stacked=true;
     datasets=d.series.map(([name,fn],k)=>({label:name, backgroundColor:pal.cat[k],
       data:d.idx.map(i=>{ const b=base(i), x=div(fn(b,i), d.total(b)); return x==null?null:x*100; }),
       borderColor:th.surface, borderWidth:{top:2}, borderSkipped:false}));
+    // обычно сумма долей = 100%; при отрицательном капитале обязательства дают больше 100% (а капитал уходит ниже нуля) —
+    // тогда шкалу не обрезаем на 100, а расширяем до ближайших 10%
+    const pos=d.idx.map((_,j)=>datasets.reduce((s,ds)=>s+Math.max(0,ds.data[j]||0),0));
+    yMax = Math.max(...pos) > 100.5 ? Math.ceil(Math.max(...pos)/10)*10 : 100;
     valueLabels={mode:'inside', min:4, format:x=>fmtNum(x,1), size:forExport?14:11};
     yTicks=x=>x+'%';
   } else if(d.kind==='bars'){
@@ -121,12 +125,15 @@ function chartConfig(d, th, forExport){
   } else {
     // коэффициенты: по оси X — коэффициенты, серии — годы
     // если коэффициентов много (2.9 — восемь), шрифт мельче, иначе подписи наезжают друг на друга
-    const dense=d.defs.length>5;
+    // при отрицательном собственном капитале коэффициенты задолженности и маневренности (СК в знаменателе)
+    // теряют смысл и дают огромные значения (−37, +15), сжимая остальные столбики — на рисунок их не выводим
+    const defs = d.idx.some(i=>base(i).SK<=0) ? d.defs.filter(([name])=>!SK_DENOM.includes(name)) : d.defs;
+    const dense=defs.length>5;
     if(dense) xFont={...font, size:forExport?12:11};
-    xLabels=d.defs.map(([name])=>wrap(cap(name), dense?14:16));
+    xLabels=defs.map(([name])=>wrap(cap(name), dense?14:16));
     const cols=yearColors(d.idx.length, pal.ramp);
     datasets=d.idx.map((i,k)=>({label:String(Y(i)), backgroundColor:cols[k], borderRadius:3,
-      data:d.defs.map(([,,fn])=>fn(base(i)))}));
+      data:defs.map(([,,fn])=>fn(base(i)))}));
     valueLabels={mode:'top', format:x=>fmtNum(x,2), ink:th.soft, size:dense?(forExport?10:10):(forExport?13:11)};
     yTicks=x=>fmtNum(x,1);
   }

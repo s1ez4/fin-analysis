@@ -74,8 +74,10 @@ document.getElementById('dlTpl').onclick=async()=>{
 
 /* ---- Word (.docx) — оформление как в образце «ФУиА задание 1.doc» ---- */
 const xe=s=>String(s).replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
-// sub — подстрочный индекс («К₂₀₂₅»)
-function wRun(text,{b,sz=28,i,sub}={}){ return `<w:r><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:cs="Times New Roman"/>${b?'<w:b/>':''}${i?'<w:i/>':''}${sub?'<w:vertAlign w:val="subscript"/>':''}<w:sz w:val="${sz}"/><w:szCs w:val="${sz}"/></w:rPr><w:t xml:space="preserve">${xe(text)}</w:t></w:r>`; }
+// sub — подстрочный индекс («К₂₀₂₅»); nbh — минус как неразрывный дефис (число в узкой ячейке не рвется на «-» и цифры)
+function wRun(text,{b,sz=28,i,sub,nbh}={}){
+  const t = nbh ? xe(text).split('-').join('</w:t><w:noBreakHyphen/><w:t xml:space="preserve">') : xe(text);
+  return `<w:r><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:cs="Times New Roman"/>${b?'<w:b/>':''}${i?'<w:i/>':''}${sub?'<w:vertAlign w:val="subscript"/>':''}<w:sz w:val="${sz}"/><w:szCs w:val="${sz}"/></w:rPr><w:t xml:space="preserve">${t}</w:t></w:r>`; }
 // Абзац текста как в образце: 14 пт, интервал 1,5, отступ первой строки 1,25 см, по ширине, без интервала после.
 // pb — начать с новой страницы, keep — не отрывать от следующего абзаца
 function wPPr({jc='both',ind=true,after=0,keep,pb}={}){
@@ -100,7 +102,7 @@ function wTable(s){
   let x=`<w:tbl><w:tblPr>${tblW}<w:tblInd w:w="${s.ind}" w:type="dxa"/>${tblB}${s.layout==='fixed'?'<w:tblLayout w:type="fixed"/>':''}<w:tblLook w:val="04A0"/></w:tblPr><w:tblGrid>${W.map(w=>`<w:gridCol w:w="${w}"/>`).join('')}</w:tblGrid>`;
   // абзац(ы) ячейки: '\n' в тексте — новый абзац (как «2020/» и «2019» в шапке 2.5)
   const paras = (text, keep, jc, pind, cell) => (text===''?['']:text.split('\n')).map(t=>
-    `<w:p><w:pPr>${keep}<w:widowControl w:val="0"/><w:spacing w:after="0" ${cell.line?'w:line="360" w:lineRule="auto"':lineSp}/>${pind!=null?`<w:ind w:left="${pind}" w:right="${pind}"/>`:''}${jc?`<w:jc w:val="${jc}"/>`:''}${markSz}</w:pPr>${t?wRun(t,{b:cell.b,i:cell.i,sz:s.sz}):''}</w:p>`).join('');
+    `<w:p><w:pPr>${keep}<w:widowControl w:val="0"/><w:spacing w:after="0" ${cell.line?'w:line="360" w:lineRule="auto"':lineSp}/>${pind!=null?`<w:ind w:left="${pind}" w:right="${pind}"/>`:''}${jc?`<w:jc w:val="${jc}"/>`:''}${markSz}</w:pPr>${t?wRun(t,{b:cell.b,i:cell.i,sz:s.sz,nbh:cell.v!==undefined}):''}</w:p>`).join('');
   rows.forEach((row,r)=>{
     const isHead=r<s.head.length;
     // высота строки: шапка — из headH, тело — своя высота строки (row.h) или общая rowH («точно» или «не меньше», как в образце)
@@ -125,7 +127,11 @@ function wTable(s){
       const text=isNum ? fx(cell.v,cell.d,cell.plus) : cell.t;
       const jc=cell.jc || (isNum?'right':'left');           // числа — по правому краю, текст — по левому
       const va=cell.va===null ? '' : (cell.va || (isNum?'bottom':'center'));   // null — без выравнивания, как в образце
-      x+=`<w:tc><w:tcPr><w:tcW w:w="${w}" w:type="dxa"/>${gs}${vm}${tcB}${va?`<w:vAlign w:val="${va}"/>`:''}</w:tcPr>${paras(text,keep,jc,cell.pind,cell)}</w:tc>`;
+      // длинное число в узкой колонке (−12766890 в 0,9 см) не влезает и переносится по цифрам — тогда, как в образце
+      // у «удельный вес, %», разрешаем тексту занять поля ячейки (отступы −108). Цифра ≈ пол-кегля = sz·5 twips
+      const tight = isNum && text.length*s.sz*5 > w-216;
+      const pind = cell.pind!=null ? cell.pind : (tight ? -108 : null);
+      x+=`<w:tc><w:tcPr><w:tcW w:w="${w}" w:type="dxa"/>${gs}${vm}${tcB}${va?`<w:vAlign w:val="${va}"/>`:''}</w:tcPr>${paras(text,keep,jc,pind,cell)}</w:tc>`;
       c+=cs;
     }
     x+='</w:tr>';
