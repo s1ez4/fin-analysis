@@ -157,13 +157,14 @@ figure.chart > figcaption{font-weight:600;font-size:.98rem;margin:.6rem 0 0;text
 @media (max-width:640px){figure.chart .chartbox{height:320px;padding:6px}}
 
 /* Раздел «Расчеты» */
-.calc{background:var(--sheet-2);border:1px solid var(--rule);border-radius:12px;padding:1.1rem 1.3rem;font-size:.97rem;line-height:1.65}
-.calc .legend{color:var(--ink-soft);font-size:.88rem;margin:0 0 .4rem}
-.calc h3{font-size:1rem;margin:1.3rem 0 .4rem;color:#cfe0ff}
-.calc h3:first-of-type{margin-top:.7rem}
-.calc p{margin:.3rem 0}
-.calc p.f{margin:.1rem 0 .1rem 1.6rem;font-variant-numeric:tabular-nums;color:#d6deea}
-.calc sub{font-size:.72em}
+/* div.calc — только раздел «Расчеты»; у ячеек итогов в таблице ввода тоже класс calc (td.calc) */
+div.calc{background:var(--sheet-2);border:1px solid var(--rule);border-radius:12px;padding:1.1rem 1.3rem;font-size:.97rem;line-height:1.65}
+div.calc .legend{color:var(--ink-soft);font-size:.88rem;margin:0 0 .4rem}
+div.calc h3{font-size:1rem;margin:1.3rem 0 .4rem;color:#cfe0ff}
+div.calc h3:first-of-type{margin-top:.7rem}
+div.calc p{margin:.3rem 0}
+div.calc p.f{margin:.1rem 0 .1rem 1.6rem;font-variant-numeric:tabular-nums;color:#d6deea}
+div.calc sub{font-size:.72em}
 
 .visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
