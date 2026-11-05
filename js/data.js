@@ -127,9 +127,19 @@ const STORE = 'fua-analysis-v1';
 let state;
 function blank(){ return {company:'', years:[2023,2024,2025], values:{}, conclusions:{}}; }
 function clone(o){ return JSON.parse(JSON.stringify(o)); }
+// Ссылка вида …/?ex=rsk сразу открывает пример «Россети Северный Кавказ» (?ex=nknh — НКНХ).
+// Если в браузере уже есть свои данные (не пример), параметр их не затирает.
+const EX_PARAM = {nknh:EXAMPLE, rsk:EXAMPLE_RSK}[new URLSearchParams(location.search).get('ex')];
 function load(){
-  try { const s = JSON.parse(localStorage.getItem(STORE)||'null'); if (s && Array.isArray(s.years) && s.values) return fillFromExample(s); } catch(e){}
-  return clone(EXAMPLE);
+  try {
+    const s = JSON.parse(localStorage.getItem(STORE)||'null');
+    if (s && Array.isArray(s.years) && s.values){
+      const isExample = EXAMPLES.some(e=>e.company===s.company);
+      if (EX_PARAM && isExample && s.company!==EX_PARAM.company) return clone(EX_PARAM);
+      return fillFromExample(s);
+    }
+  } catch(e){}
+  return clone(EX_PARAM || EXAMPLE);
 }
 // Если в браузере сохранен один из примеров старой версии — дописываем недостающие значения из него
 // (только пустые клетки; то, что вписано вручную, и выводы не трогаем)
