@@ -44,7 +44,7 @@ function tableSheet(s){
       if(cell.v!==undefined){
         if(cell.v==null||!Number.isFinite(cell.v)) line.push('-');
         else line.push({t:'n', v:Math.round(cell.v*10**cell.d)/10**cell.d, z:cell.plus?'+General;-General;0':'General'});
-      } else line.push(cell.t);
+      } else line.push(cell.t.replace(/^\n+/,''));   // пустые абзацы над «2019 год» (2.7) нужны только в Word
     }
     aoa.push(line);
   });
@@ -79,41 +79,53 @@ function wRun(text,{b,sz=28,i,sub}={}){ return `<w:r><w:rPr><w:rFonts w:ascii="T
 // Абзац текста как в образце: 14 пт, интервал 1,5, отступ первой строки 1,25 см, по ширине, без интервала после.
 // pb — начать с новой страницы, keep — не отрывать от следующего абзаца
 function wPPr({jc='both',ind=true,after=0,keep,pb}={}){
-  return `<w:pPr><w:widowControl w:val="0"/>${keep?'<w:keepNext/>':''}${pb?'<w:pageBreakBefore/>':''}<w:spacing w:after="${after}" w:line="360" w:lineRule="auto"/>${ind?'<w:ind w:firstLine="709"/>':''}<w:jc w:val="${jc}"/></w:pPr>`;
+  return `<w:pPr>${keep?'<w:keepNext/>':''}${pb?'<w:pageBreakBefore/>':''}<w:widowControl w:val="0"/><w:spacing w:after="${after}" w:line="360" w:lineRule="auto"/>${ind?'<w:ind w:firstLine="709"/>':''}<w:jc w:val="${jc}"/></w:pPr>`;
 }
 function wPara(text,{b,sz=28,...o}={}){ return `<w:p>${wPPr(o)}${wRun(text,{b,sz})}</w:p>`; }
 // абзац из нескольких кусков текста: runs = [{t, sub}]
 function wParaRuns(runs,{sz=28,...o}={}){ return `<w:p>${wPPr(o)}${runs.map(r=>wRun(r.t,{sz,sub:r.sub})).join('')}</w:p>`; }
 const wText = text => (text||'').split(/\n+/).filter(Boolean).map(p=>wPara(p)).join('');
 
-// Таблица по спецификации из docstyle.js: {grid, sz, line, bsz, rowH, head, body}
+// Таблица по спецификации из docstyle.js (параметры каждой таблицы сняты с образца):
+// {grid, sz, line, tblB, cellB, ind, layout, tblW, headH, rowH, rowExact, cont, head, body}
 function wTable(s){
   const rows=[...s.head,...s.body], grid=layout(rows,s.ncols), W=s.grid;
-  const bd=['top','left','bottom','right','insideH','insideV'].map(k=>`<w:${k} w:val="single" w:sz="${s.bsz}" w:space="0" w:color="auto"/>`).join('');
+  const brd = (b,sides) => b ? sides.map(k=>`<w:${k} w:val="${b.val}" w:sz="${b.sz}" w:space="0" w:color="auto"/>`).join('') : '';
+  const tblB = s.tblB ? `<w:tblBorders>${brd(s.tblB,['top','left','bottom','right','insideH','insideV'])}</w:tblBorders>` : '';
+  const tcB  = s.cellB ? `<w:tcBorders>${brd(s.cellB,['top','left','bottom','right'])}</w:tcBorders>` : '';   // рамка у каждой ячейки
   const lineSp = s.line ? 'w:line="360" w:lineRule="auto"' : 'w:line="240" w:lineRule="auto"';
   const markSz = `<w:rPr><w:sz w:val="${s.sz}"/><w:szCs w:val="${s.sz}"/></w:rPr>`;  // кегль знака абзаца как у текста — иначе пустые строки выше, чем в образце
   const small = rows.length<=16;   // небольшую таблицу держим целиком на одной странице
-  let x=`<w:tbl><w:tblPr><w:tblW w:w="0" w:type="auto"/><w:tblInd w:w="108" w:type="dxa"/><w:tblBorders>${bd}</w:tblBorders><w:tblLayout w:type="fixed"/><w:tblLook w:val="04A0"/></w:tblPr><w:tblGrid>${W.map(w=>`<w:gridCol w:w="${w}"/>`).join('')}</w:tblGrid>`;
+  const tblW = s.tblW ? `<w:tblW w:w="${s.tblW}" w:type="dxa"/>` : '<w:tblW w:w="0" w:type="auto"/>';
+  let x=`<w:tbl><w:tblPr>${tblW}<w:tblInd w:w="${s.ind}" w:type="dxa"/>${tblB}${s.layout==='fixed'?'<w:tblLayout w:type="fixed"/>':''}<w:tblLook w:val="04A0"/></w:tblPr><w:tblGrid>${W.map(w=>`<w:gridCol w:w="${w}"/>`).join('')}</w:tblGrid>`;
+  // абзац(ы) ячейки: '\n' в тексте — новый абзац (как «2020/» и «2019» в шапке 2.5)
+  const paras = (text, keep, jc, pind, cell) => (text===''?['']:text.split('\n')).map(t=>
+    `<w:p><w:pPr>${keep}<w:widowControl w:val="0"/><w:spacing w:after="0" ${cell.line?'w:line="360" w:lineRule="auto"':lineSp}/>${pind!=null?`<w:ind w:left="${pind}" w:right="${pind}"/>`:''}${jc?`<w:jc w:val="${jc}"/>`:''}${markSz}</w:pPr>${t?wRun(t,{b:cell.b,i:cell.i,sz:s.sz}):''}</w:p>`).join('');
   rows.forEach((row,r)=>{
     const isHead=r<s.head.length;
+    // высота строки: шапка — из headH, тело — своя высота строки (row.h) или общая rowH («точно» или «не меньше», как в образце)
+    const H = isHead ? s.headH[r] : (row.h || (s.rowH ? {h:s.rowH, exact:s.rowExact} : null));
+    const trH = H ? `<w:trHeight ${H.exact?'w:hRule="exact" ':''}w:val="${H.h}"/>` : '';
     // строка не разрывается между страницами; шапка повторяется на новой странице
-    const trPr='<w:cantSplit/>'+(isHead?'<w:tblHeader/>':'')+(!isHead&&s.rowH?`<w:trHeight w:val="${s.rowH}"/>`:'');
-    x+=`<w:tr><w:trPr>${trPr}</w:trPr>`;
+    x+=`<w:tr><w:trPr><w:cantSplit/>${isHead?'<w:tblHeader/>':''}${trH}</w:trPr>`;
     const keep = (small||isHead) && r<rows.length-1 ? '<w:keepNext/>' : '';   // «не отрывать от следующей строки»
     let c=0;
     while(c<s.ncols){
       const g=grid[r][c];
-      if(!g){ x+=`<w:tc><w:tcPr><w:tcW w:w="${W[c]}" w:type="dxa"/></w:tcPr><w:p/></w:tc>`; c++; continue; }
+      if(!g){ x+=`<w:tc><w:tcPr><w:tcW w:w="${W[c]}" w:type="dxa"/>${tcB}</w:tcPr><w:p/></w:tc>`; c++; continue; }
       const cell=g.cell, cs=cell.cs||1, w=W.slice(c,c+cs).reduce((a,b)=>a+b,0);
       const gs=cs>1?`<w:gridSpan w:val="${cs}"/>`:'';
-      const pEmpty=`<w:p><w:pPr><w:widowControl w:val="0"/>${keep}<w:spacing w:after="0" ${lineSp}/>${markSz}</w:pPr></w:p>`;
-      if(g.r0!==r){ x+=`<w:tc><w:tcPr><w:tcW w:w="${w}" w:type="dxa"/>${gs}<w:vMerge/></w:tcPr>${pEmpty}</w:tc>`; c+=cs; continue; }
+      if(g.r0!==r){   // продолжение объединенной по вертикали ячейки
+        const ct=s.cont(c)||{};
+        x+=`<w:tc><w:tcPr><w:tcW w:w="${w}" w:type="dxa"/>${gs}<w:vMerge/>${tcB}${ct.va?`<w:vAlign w:val="${ct.va}"/>`:''}</w:tcPr>${paras('',keep,ct.jc,null,{})}</w:tc>`;
+        c+=cs; continue;
+      }
       const vm=(cell.rs||1)>1?'<w:vMerge w:val="restart"/>':'';
       const isNum=cell.v!==undefined;
       const text=isNum ? fx(cell.v,cell.d,cell.plus) : cell.t;
       const jc=cell.jc || (isNum?'right':'left');           // числа — по правому краю, текст — по левому
-      const va=cell.va || (isNum?'bottom':'center');
-      x+=`<w:tc><w:tcPr><w:tcW w:w="${w}" w:type="dxa"/>${gs}${vm}<w:vAlign w:val="${va}"/></w:tcPr><w:p><w:pPr><w:widowControl w:val="0"/>${keep}<w:spacing w:after="0" ${lineSp}/><w:jc w:val="${jc}"/>${markSz}</w:pPr>${text?wRun(text,{b:cell.b,i:cell.i,sz:s.sz}):''}</w:p></w:tc>`;
+      const va=cell.va===null ? '' : (cell.va || (isNum?'bottom':'center'));   // null — без выравнивания, как в образце
+      x+=`<w:tc><w:tcPr><w:tcW w:w="${w}" w:type="dxa"/>${gs}${vm}${tcB}${va?`<w:vAlign w:val="${va}"/>`:''}</w:tcPr>${paras(text,keep,jc,cell.pind,cell)}</w:tc>`;
       c+=cs;
     }
     x+='</w:tr>';
@@ -169,6 +181,7 @@ async function buildDocx(){
     body+=wPara('',{ind:false});
     body+=wPara(`Таблица ${t.num} - ${t.title}`,{ind:false,keep:true});
     body+=wTable(t);
+    body+=wPara('');   // пустой абзац после таблицы, как в образце
     body+=wText(state.conclusions[t.id]);
     for(const im of images.filter(x=>x.after===t.id)){
       const n=rels.length+1, rid='rIdImg'+n, file=`media/chart${n}.png`;
@@ -182,10 +195,22 @@ async function buildDocx(){
   const ns='xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"';
   // поля как в образце: верх/низ 2 см, левое 3 см, правое 1 см
   const doc=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document ${ns}><w:body>${body}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1134" w:right="567" w:bottom="1134" w:left="1701" w:header="709" w:footer="709" w:gutter="0"/></w:sectPr></w:body></w:document>`;
-  zip.file('[Content_Types].xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>');
+  zip.file('[Content_Types].xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/></Types>');
   zip.file('_rels/.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>');
+  rels.push('<Relationship Id="rIdStyles" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>',
+            '<Relationship Id="rIdSettings" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/>');
   zip.file('word/_rels/document.xml.rels',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${rels.join('')}</Relationships>`);
   zip.file('word/document.xml',doc);
+  // Стили и настройки — как в образце: «Обычный» = Times New Roman 12 пт, поля ячеек 0,19 см,
+  // режим совместимости Word 2003 (compatibilityMode 11) — по нему Word верстает таблицы образца
+  // (переносы в узких ячейках, отрицательные отступы у «удельный вес, %» и т.п.)
+  const W='xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"';
+  zip.file('word/styles.xml',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles ${W}><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Times New Roman" w:eastAsia="Times New Roman" w:hAnsi="Times New Roman" w:cs="Times New Roman"/><w:lang w:val="ru-RU" w:eastAsia="ru-RU" w:bidi="ar-SA"/></w:rPr></w:rPrDefault><w:pPrDefault/></w:docDefaults>`+
+    `<w:style w:type="paragraph" w:default="1" w:styleId="a"><w:name w:val="Normal"/><w:qFormat/><w:rPr><w:rFonts w:ascii="Times New Roman" w:eastAsia="Times New Roman" w:hAnsi="Times New Roman"/><w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr></w:style>`+
+    `<w:style w:type="table" w:default="1" w:styleId="a1"><w:name w:val="Normal Table"/><w:uiPriority w:val="99"/><w:semiHidden/><w:unhideWhenUsed/><w:qFormat/><w:tblPr><w:tblInd w:w="0" w:type="dxa"/><w:tblCellMar><w:top w:w="0" w:type="dxa"/><w:left w:w="108" w:type="dxa"/><w:bottom w:w="0" w:type="dxa"/><w:right w:w="108" w:type="dxa"/></w:tblCellMar></w:tblPr></w:style></w:styles>`);
+  zip.file('word/settings.xml',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:settings ${W}><w:defaultTabStop w:val="708"/><w:characterSpacingControl w:val="doNotCompress"/>`+
+    `<w:compat><w:useNormalStyleForList/><w:doNotUseIndentAsNumberingTabStop/><w:useAltKinsokuLineBreakRules/><w:allowSpaceOfSameStyleInTable/><w:doNotSuppressIndentation/><w:doNotAutofitConstrainedTables/><w:autofitToFirstFixedWidthCell/><w:underlineTabInNumList/><w:displayHangulFixedWidth/><w:splitPgBreakAndParaMark/><w:doNotVertAlignCellWithSp/><w:doNotBreakConstrainedForcedTable/><w:doNotVertAlignInTxbx/><w:useAnsiKerningPairs/><w:cachedColBalance/>`+
+    `<w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="11"/></w:compat></w:settings>`);
   return zip.generateAsync({type:'blob'});
 }
 document.getElementById('dlDocx').onclick=async()=>{
