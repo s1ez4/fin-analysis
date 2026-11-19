@@ -63,7 +63,7 @@ function renderOut(){
 function renderCtx(){
   document.getElementById('ctx').textContent = (state.company||'Организация не указана')+' · '+state.years[0]+'–'+state.years[nYears()-1]+' гг.';
   // подсветить выбранную компанию в переключателе
-  document.querySelectorAll('#coSel button').forEach(b=>b.setAttribute('aria-pressed', EXAMPLES[+b.dataset.co].company===state.company));
+  document.querySelectorAll('button[data-co]').forEach(b=>b.setAttribute('aria-pressed', EXAMPLES[+b.dataset.co].company===state.company));
 }
 
 /* ===================== Вкладки: «Анализ отчетности» / «Анализ финансовых результатов» ===================== */
@@ -194,7 +194,6 @@ document.getElementById('company').addEventListener('input',e=>{ state.company=e
 document.getElementById('hideZero').addEventListener('change',renderOut);
 // рисунок выручки и прибыли: в образце его нет, поэтому его можно выключить (номера рисунков пересчитаются)
 document.getElementById('revChart').addEventListener('change',e=>{ state.revChart=e.target.checked; renderOut(); save(); });
-// Кнопки примеров: data-example — номер в EXAMPLES (0 — НКНХ, 1 — Россети Северный Кавказ)
 // Переключатель компаний (НКНХ / Россети СК) в верхней панели — действует на все расчеты обеих вкладок.
 // Данные каждой компании (с вашими правками и выводами) запоминаются отдельно, поэтому при переключении
 // туда-обратно ничего не теряется; при первом выборе берется встроенный пример.
@@ -209,8 +208,8 @@ function selectCompany(k){
   document.getElementById('company').value=state.company; innIn.value=state.inn||''; updNalog();
   refreshAll(); status('Компания: '+state.company);
 }
-document.getElementById('coSel').addEventListener('click',e=>{ const b=e.target.closest('button[data-co]'); if(b) selectCompany(+b.dataset.co); });
-document.querySelectorAll('[data-example]').forEach(b=>b.onclick=()=>{ state=clone(EXAMPLES[+b.dataset.example]); document.getElementById('company').value=state.company; innIn.value=state.inn; updNalog(); refreshAll(); status('Загружен пример: '+state.company); });
+// Кнопки компаний — в верхней панели и в разделе 1; data-co — номер в EXAMPLES (0 — НКНХ, 1 — Россети СК)
+document.querySelectorAll('button[data-co]').forEach(b=>b.onclick=()=>selectCompany(+b.dataset.co));
 document.getElementById('clearAll').onclick=()=>{ state=blank(); document.getElementById('company').value=''; innIn.value=''; updNalog(); refreshAll(); status('Данные очищены'); };
 
 // поле вывода растягивается по тексту, без внутренней прокрутки

@@ -196,3 +196,4 @@ ul.tnotes li{margin:.15rem 0}
 .cosel button{font-size:.88rem}
 .cosel button[aria-pressed="true"]{background:linear-gradient(135deg,rgba(110,168,255,.28),rgba(155,140,255,.22));color:var(--ink);font-weight:600;box-shadow:0 0 0 1px var(--accent) inset}
 @media (max-width:640px){.cosel{width:100%}.cosel button{flex:1;padding:.45rem .5rem}}
+.btn.ghost.co-btn[aria-pressed="true"]{background:linear-gradient(135deg,rgba(110,168,255,.28),rgba(155,140,255,.22));border-color:var(--accent);font-weight:600}

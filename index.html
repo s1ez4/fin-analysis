@@ -51,9 +51,11 @@
         <label class="btn ghost" for="xlsxIn" tabindex="0">Загрузить Excel</label>
         <input id="xlsxIn" class="visually-hidden" type="file" accept=".xlsx,.xls,.csv">
         <button class="btn ghost" id="dlTpl">Скачать шаблон Excel</button>
-        <span class="spacer" style="flex:1"></span>
-        <button class="btn ghost small" id="loadExample" data-example="0">Пример: Нижнекамскнефтехим 2023–2025</button>
-        <button class="btn ghost small" data-example="1">Пример: Россети Северный Кавказ 2023–2025</button>
+      </div>
+      <div class="row">
+        <span class="hint">Компания:</span>
+        <button type="button" class="btn ghost small co-btn" data-co="0" aria-pressed="false">Нижнекамскнефтехим 2023–2025</button>
+        <button type="button" class="btn ghost small co-btn" data-co="1" aria-pressed="false">Россети Северный Кавказ 2023–2025</button>
         <button class="btn ghost small" id="clearAll">Очистить</button>
       </div>
       <div class="row nalog">
