@@ -85,6 +85,7 @@ function ratioCheck(name, fn, norm, d, b){
 // ячейка: {t:текст} | {v:число,k:'num'|'pct'|'r',d:знаки}; заголовки: {t,cs,rs}
 const N = (val,k='num',d=0)=>({v:val,k,d});
 const T = t=>({t});
+const D_ = (val,k='num',d=0)=>({v:val,k,d,dev:true});   // ячейка-отклонение: «+» подсвечивается зеленым
 function fmt(c){
   if (c.t!=null) return c.t;
   if (c.v==null || !Number.isFinite(c.v)) return '—';
@@ -108,7 +109,7 @@ function tblHorizontal(id, num, title, lines, first){
     if (l.h) return {sec:true, cells:[T(l.h)]};
     const x = state.years.map((_,i)=>vals(l,i));
     return {t:l.t, cells:[T(l.n), ...x.map(a=>N(a)),
-      ...P.map(i=> N(x[i]!=null&&x[i-1]!=null ? x[i]-x[i-1] : null)),
+      ...P.map(i=> D_(x[i]!=null&&x[i-1]!=null ? x[i]-x[i-1] : null)),
       ...P.map(i=> N(x[i]!=null&&x[i-1] ? x[i]/x[i-1]*100 : null,'pct',2))]};
   });
   return {id,num,title,head,rows,ncols:1+n+2*P.length};
@@ -125,7 +126,7 @@ function tblVertical(id, num, title, lines, first, totalCode){
     const x=state.years.map((_,i)=>vals(l,i));
     const sh=state.years.map((_,i)=> x[i]!=null ? div(x[i], hv[i]?v(totalCode,i):null) : null).map(a=>a==null?null:a*100);
     return {t:l.t, cells:[T(l.n), ...x.flatMap((a,i)=>[N(a),N(sh[i],'pct',2)]),
-      ...P.map(i=>N(sh[i]!=null&&sh[i-1]!=null ? sh[i]-sh[i-1] : null,'pct',2))]};
+      ...P.map(i=>D_(sh[i]!=null&&sh[i-1]!=null ? sh[i]-sh[i-1] : null,'pct',2))]};
   });
   return {id,num,title,head,rows,ncols:1+2*n+P.length};
 }
@@ -150,7 +151,7 @@ function tblProfit(){
   const vals=(l,i)=> hp[i] ? v(l.c,i) : null;
   const rows=visible(LINES.pl, l=>state.years.map((_,i)=>vals(l,i))).map(l=>{
     const x=state.years.map((_,i)=>vals(l,i));
-    return {t:l.t, sub:l.sub, cells:[T(l.n),...x.map(a=>N(a)),...P.map(i=>N(x[i]!=null&&x[i-1]!=null?x[i]-x[i-1]:null))]};
+    return {t:l.t, sub:l.sub, cells:[T(l.n),...x.map(a=>N(a)),...P.map(i=>D_(x[i]!=null&&x[i-1]!=null?x[i]-x[i-1]:null))]};
   });
   return {id:'t27',num:'2.7',title:'Анализ формирования прибыли',head,rows,ncols:1+nYears()+P.length};
 }
@@ -159,7 +160,7 @@ function tblRatios(id,num,title,defs){
   const head=[[{t:'Коэффициенты'},{t:'Норматив'},...state.years.map(y=>({t:String(y)})),...P.map(i=>({t:Y(i)+'–'+Y(i-1)}))]];
   const rows=defs.map(([name,norm,fn,d])=>{
     const x=state.years.map((_,i)=>hv[i]?fn(base(i)):null);
-    return {cells:[T(name),T(norm),...x.map(a=>N(a,'r',d)),...P.map(i=>N(x[i]!=null&&x[i-1]!=null?x[i]-x[i-1]:null,'r',d))]};
+    return {cells:[T(name),T(norm),...x.map(a=>N(a,'r',d)),...P.map(i=>D_(x[i]!=null&&x[i-1]!=null?x[i]-x[i-1]:null,'r',d))]};
   });
   return {id,num,title,head,rows,ncols:2+nYears()+P.length};
 }

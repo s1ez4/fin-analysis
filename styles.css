@@ -124,6 +124,9 @@ tr.t2 td{font-weight:700;border-top:1px solid var(--rule-strong);background:rgba
 tr.sub td.name{padding-left:1.6rem;color:var(--ink-soft)}
 tr:last-child td{border-bottom:0}
 td.ok{color:var(--ok);font-weight:600}
+td.pos{color:var(--ok)}
+td.warn{color:#ffc46b;font-weight:700}
+td.okv{color:var(--ok)}
 td.bad{color:var(--red);font-weight:600}
 
 table.grid input{width:100%;min-width:9.5em;text-align:right;border:1px solid transparent;background:transparent;padding:.28rem .4rem;border-radius:6px;font-variant-numeric:tabular-nums}
@@ -168,3 +171,22 @@ div.calc sub{font-size:.72em}
 
 .visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* ===================== Вкладки и шапка ===================== */
+.maintabs{background:var(--sheet)}
+.maintabs button{font-size:.9rem}
+.ctx{color:var(--ink-soft);font-size:.9rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:38ch}
+@media (max-width:640px){.maintabs{width:100%}.maintabs button{flex:1;padding:.45rem .5rem}.ctx{max-width:100%}}
+
+/* ===================== Формулы и пометки под таблицами ===================== */
+p.formula{margin:.55rem 0 0;font-size:.86rem;color:var(--ink-soft);line-height:1.5}
+p.formula b{color:var(--ink);font-weight:600}
+ul.tnotes{margin:.35rem 0 0;padding-left:1.2rem;font-size:.86rem;color:#ffd79a}
+ul.tnotes li{margin:.15rem 0}
+#frNotes ul{margin:.3rem 0 0;padding-left:1.2rem}
+#frNotes:empty{display:none}
+#fr .msg{margin-bottom:1rem;color:#ffd79a}
+.frconcl{background:var(--sheet-2);border:1px solid var(--rule);border-radius:12px;padding:.9rem 1.2rem;line-height:1.65}
+.frconcl h3{font-size:1rem;margin:.9rem 0 .3rem;color:#cfe0ff}
+.frconcl h3:first-child{margin-top:.2rem}
+.frconcl p{margin:.25rem 0}

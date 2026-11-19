@@ -13,7 +13,7 @@ function tableHTML(t){
       const cell=s.cell, span=(cell.cs>1?` colspan="${cell.cs}"`:'')+(cell.rs>1?` rowspan="${cell.rs}"`:'');
       if (cell.hd){ h+=`<th${span}>${esc(cell.t)}</th>`; continue; }
       const isNum = cell.v!==undefined;
-      const k = isNum ? ('num'+(cell.v<0?' neg':'')) : (c===0?'name':(cell.cls||''));
+      const k = isNum ? ('num'+(cell.v<0&&fmt(cell)!=='0'?' neg':'')+(cell.dev&&cell.v>0&&/[1-9]/.test(fmt(cell))?' pos':'')+(cell.x?' '+cell.x:'')) : (c===0?'name':(cell.cls||''));
       h+=`<td class="${k}"${span}>${esc(fmt(cell))}</td>`;
     }
     h+='</tr>';
@@ -21,6 +21,19 @@ function tableHTML(t){
   return h+'</table>';
 }
 let sampleFn = null, downloadsNs = null, imagesOk = false;
+// Одна строка с формулами под каждой таблицей первой вкладки (на странице; в Word и Excel не попадает)
+const TABLE_FORMULAS = {
+  t22:'Абсолютное отклонение = Xᵢ − Xᵢ₋₁; относительное отклонение = Xᵢ / Xᵢ₋₁ × 100%.',
+  t23:'Абсолютное отклонение = Xᵢ − Xᵢ₋₁; относительное отклонение = Xᵢ / Xᵢ₋₁ × 100%.',
+  t24:'Удельный вес = статья / Баланс (стр. 1600) × 100%; изменение удельного веса = уд. весᵢ − уд. весᵢ₋₁, п. п.',
+  t25:'Удельный вес = статья / Баланс (стр. 1700) × 100%; изменение удельного веса = уд. весᵢ − уд. весᵢ₋₁, п. п.',
+  t26:'Разница = КЗ (стр. 1520) − ДЗ (стр. 1230); КЗ на 1 руб. ДЗ = КЗ / ДЗ.',
+  t27:'ВП = 2110 − 2120; Пп = ВП − 2210 − 2220; Пнобл = Пп + 2310 + 2320 − 2330 + 2340 − 2350; ПЧ = Пнобл − 2410 + 2460; отклонение = Xᵢ − Xᵢ₋₁.',
+  t28:'Кабс = (ДС + КФВ) / КО; Ксроч = (ДС + КФВ + ДЗ) / КО; Кмоб = (З + НДС) / КО; Кобщ = (ДС + КФВ + ДЗ + З) / КО.',
+  t29:'Кнез = СК / ВБ; Кнапр = ЗК / ВБ; Ксамоф = СК / ЗК; Кзад = ЗК / СК; Кобесп = СОК / ОА; Кманевр = СОК / СК; Кмоб/иммоб = ОА / ВОА; Кипн = (ВОА + З) / ВБ.',
+  t210:'СОК = СК − ВОА; СДИ = СОК + ДКЗ; ОИ = СДИ + ККЗ; ΔСОК = СОК − З; ΔСДИ = СДИ − З; ΔОИ = ОИ − З.',
+  t211:'А1 = ДС + КФВ; А2 = ДЗ + прочие ОА; А3 = З + НДС + активы к продаже; А4 = ВОА; П1 = КЗ + прочие КО; П2 = ККЗ; П3 = ДО; П4 = СК + ДБП + оценочные обязательства.',
+};
 function renderOut(){
   const tables = buildTables();
   document.getElementById('toc').innerHTML = tables.map(t=>`<a href="#${t.id}">Таблица ${t.num}</a>`).join('')+'<a href="#s4">Расчеты</a>';
@@ -29,6 +42,7 @@ function renderOut(){
     <figure class="tbl" id="${t.id}">
       <figcaption>Таблица ${t.num} – ${esc(t.title)}</figcaption>
       <div class="scroll">${tableHTML(t)}</div>
+      ${TABLE_FORMULAS[t.id]?`<p class="formula"><b>Формулы:</b> ${esc(TABLE_FORMULAS[t.id])}</p>`:''}
       <div class="concl">
         <textarea data-id="${t.id}" placeholder="Вывод по таблице ${t.num} — напишите сами или нажмите «Сгенерировать вывод»">${esc(state.conclusions[t.id]||'')}</textarea>
         <div class="row">
@@ -40,9 +54,30 @@ function renderOut(){
     </figure>${chartFiguresHTML(t.id)}`).join('');
   document.getElementById('calc').innerHTML = calcHTML();
   renderKpis();
+  renderCtx();
   document.querySelectorAll("#out textarea").forEach(autosize);
   drawCharts();
+  renderFR();
 }
+// Единая шапка: компания и выбранные годы (видна на обеих вкладках)
+function renderCtx(){
+  document.getElementById('ctx').textContent = (state.company||'Организация не указана')+' · '+state.years[0]+'–'+state.years[nYears()-1]+' гг.';
+}
+
+/* ===================== Вкладки: «Анализ отчетности» / «Анализ финансовых результатов» ===================== */
+function showPane(p){
+  if (p!=='fr') p='main';
+  document.querySelectorAll('[data-pane]').forEach(el=>{
+    if (el.closest('#mainTabs')) el.setAttribute('aria-selected', el.dataset.pane===p);
+    else el.hidden = el.dataset.pane!==p;
+  });
+  try{ localStorage.setItem('fua-pane', p); }catch(e){}
+  if (p==='main') drawCharts();   // графики Chart.js не рисуются в скрытом блоке — перерисовываем при возврате
+}
+document.getElementById('mainTabs').addEventListener('click',e=>{
+  const b=e.target.closest('button[data-pane]'); if(!b) return;
+  showPane(b.dataset.pane); window.scrollTo({top:0});
+});
 
 /* ===================== Ключевые показатели в шапке ===================== */
 // Компактная сумма: тыс. руб. → «615,4 млрд руб.» / «12,3 млн руб.»
@@ -153,7 +188,7 @@ document.getElementById('delYear').onclick=()=>{
   if(nYears()<=2) return status('Минимум 2 года');
   state.years.shift(); for(const k in state.values) state.values[k].shift(); refreshAll();
 };
-document.getElementById('company').addEventListener('input',e=>{ state.company=e.target.value; save(); });
+document.getElementById('company').addEventListener('input',e=>{ state.company=e.target.value; renderCtx(); save(); });
 document.getElementById('hideZero').addEventListener('change',renderOut);
 // рисунок выручки и прибыли: в образце его нет, поэтому его можно выключить (номера рисунков пересчитаются)
 document.getElementById('revChart').addEventListener('change',e=>{ state.revChart=e.target.checked; renderOut(); save(); });
@@ -193,15 +228,20 @@ document.getElementById('xlsxIn').addEventListener('change',async e=>{
     let yc=null, years=null;
     for(const r of rows){ const idx=r.map((x,j)=>/^(19|20)\d{2}$/.test(String(x??'').trim())?j:-1).filter(j=>j>=0); if(idx.length>=2){ yc=idx; years=idx.map(j=>parseInt(r[j],10)); break; } }
     if(!years) throw new Error('не нашел строку с годами (например 2023, 2024, 2025)');
-    const vals={}; let cnt=0;
-    for(const r of rows){ const code=r.map(x=>String(x??'').trim()).find(x=>/^\d{4}$/.test(x)&&BYCODE[x]); if(!code||!INPUT_CODES.includes(code)) continue;
+    const vals={}, rep={}; let cnt=0;
+    for(const r of rows){ const code=r.map(x=>String(x??'').trim()).find(x=>/^\d{4}$/.test(x)&&BYCODE[x]);
+      if(code&&REPORTED_CODES.includes(code)) rep[code]=yc.map(j=>typeof r[j]==='number'?r[j]:parseNum(r[j]??''));
+      if(!code||!INPUT_CODES.includes(code)) continue;
       vals[code]=yc.map(j=>{ const x=typeof r[j]==='number'?r[j]:parseNum(r[j]??''); if(x!=null) cnt++; return x; }); }
-    applyImport(years, vals, null);
+    applyImport(years, vals, null, rep);
     msg(`Из Excel загружено ${cnt} значений за ${years.join(', ')}. Проверьте цифры ниже.`);
   }catch(err){ msg('Не удалось прочитать Excel: '+err.message, true); }
 });
-function applyImport(years, vals, company){
-  // vals: {code: [по years]}
+// Итоговые строки ОФР, которые запоминаем «как в отчете» — для проверки цепочки прибыли (вкладка 2)
+const REPORTED_CODES=['2100','2200','2300','2400'];
+function applyImport(years, vals, company, rep){
+  // vals: {code: [по years]}; rep: {code: [по years]} — итоги из отчета, хранятся по годам: state.reported[code][year]
+  if(rep){ state.reported ||= {}; for(const c in rep){ state.reported[c] ||= {}; years.forEach((y,j)=>{ const x=rep[c][j]; if(x!=null) state.reported[c][y]=x; }); } }
   const all=[...new Set([...state.years, ...years])].sort((a,b)=>a-b).slice(-5);
   const nv={};
   for(const c of INPUT_CODES){
@@ -274,7 +314,7 @@ function renderThumbs(){
 }
 document.getElementById('thumbs').addEventListener('click',e=>{ const b=e.target.closest('.thumb'); if(!b) return; const p=pages[+b.dataset.p]; p.sel=!p.sel; renderThumbs(); });
 
-const EXTRACT_CODES = INPUT_CODES.concat(['1100','1200','1300','1400','1500','1600','1700','2410','2400']);
+const EXTRACT_CODES = INPUT_CODES.concat(['1100','1200','1300','1400','1500','1600','1700','2100','2200','2300','2410','2400']);
 document.getElementById('recognize').onclick=async()=>{
   const sel=pages.filter(p=>p.sel); if(!sel.length||!sampleFn) return;
   const btn=document.getElementById('recognize'); btn.disabled=true;
@@ -305,8 +345,8 @@ document.getElementById('recognize').onclick=async()=>{
     }
     // если есть только итог налога 2410 — кладем его в текущий налог
     if(raw['2410']&&!raw['2411']&&!raw['2412']) vals['2411']=ys.map(y=>{const x=raw['2410'][y]; return x==null?null:-(typeof x==='number'?x:parseNum(x)); });
-    const before=state.years.slice();
-    applyImport(ys, vals, typeof res.company==='string'?res.company:null);
+    const rep={}; for(const c of REPORTED_CODES) if(raw[c]) rep[c]=ys.map(y=>{ const x=raw[c][y]; return x==null||x===''?null:(typeof x==='number'?x:parseNum(x)); });
+    applyImport(ys, vals, typeof res.company==='string'?res.company:null, rep);
     // сверка итогов
     const warn=[];
     for(const tc of ['1600','1700','2400']){ if(!raw[tc]) continue; for(const y of ys){ const i=state.years.indexOf(y); const got=raw[tc][y]; if(i<0||got==null) continue; const calc=v(tc,i); if(calc!=null&&Math.abs(calc-got)>1) warn.push(`${tc} за ${y}: в отчете ${fmt(N(got))}, по строкам ${fmt(N(calc))}`); } }
@@ -354,6 +394,7 @@ document.getElementById('company').value=state.company||'';
 innIn.value=state.inn||''; updNalog();
 document.getElementById('revChart').checked = state.revChart!==false;
 refreshAll();
+showPane(location.hash==='#fr' ? 'fr' : (()=>{ try{ return localStorage.getItem('fua-pane'); }catch(e){ return null; } })());
 (async()=>{
   if(!window.claude||!window.claude.use) { renderThumbs(); return; }
   try{ downloadsNs=await window.claude.use('downloads'); }catch(e){}

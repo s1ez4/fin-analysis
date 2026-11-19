@@ -25,13 +25,19 @@
   </header>
 
   <div class="bar" role="toolbar" aria-label="Действия">
-    <button class="btn" id="dlXlsx">Скачать Excel</button>
-    <button class="btn" id="dlDocx">Скачать Word</button>
+    <div class="tabs maintabs" role="tablist" id="mainTabs" aria-label="Вкладки анализа">
+      <button role="tab" aria-selected="true" data-pane="main">Анализ отчетности</button>
+      <button role="tab" aria-selected="false" data-pane="fr">Анализ финансовых результатов</button>
+    </div>
+    <span class="ctx" id="ctx"></span>
     <span class="spacer"></span>
+    <button class="btn" id="dlXlsx" data-pane="main">Скачать Excel</button>
+    <button class="btn" id="dlDocx" data-pane="main">Скачать Word</button>
+    <button class="btn" id="dlFr" data-pane="fr" hidden>Скачать Excel (финрезультаты)</button>
     <span class="status" id="status" aria-live="polite"></span>
   </div>
 
-  <section class="step" id="s1">
+  <section class="step" id="s1" data-pane="main">
     <h2><span class="n">1</span>Загрузите отчетность</h2>
     <p class="lead">PDF или фото страниц с балансом (форма 0710001) и отчетом о финансовых результатах (0710002). Claude распознает строки по кодам. Можно загрузить и заполненный шаблон Excel.</p>
     <div class="drop" id="drop">
@@ -62,7 +68,7 @@
     </div>
   </section>
 
-  <section class="step" id="s2">
+  <section class="step" id="s2" data-pane="main">
     <h2><span class="n">2</span>Проверьте цифры</h2>
     <p class="lead">Значения в тыс. руб. Итоги считаются сами. Отрицательные числа можно вводить в скобках. В ОФР расходы вводятся положительными, как в таблице 2.7. Можно вставлять столбец прямо из Excel.</p>
     <div class="tabs" role="tablist" id="tabs">
@@ -80,7 +86,7 @@
     <div class="check" id="check"></div>
   </section>
 
-  <section class="step" id="s3">
+  <section class="step" id="s3" data-pane="main">
     <h2><span class="n">3</span>Таблицы анализа</h2>
     <p class="lead">Нумерация и формулы — как в задании. Под каждой таблицей можно написать вывод вручную, собрать шаблонный вывод по цифрам кнопкой «Сгенерировать вывод» или попросить черновик у Claude — выводы тоже попадут в Word.</p>
     <div class="opts">
@@ -92,10 +98,18 @@
     <div id="out"></div>
   </section>
 
-  <section class="step" id="s4">
+  <section class="step" id="s4" data-pane="main">
     <h2><span class="n">4</span>Расчеты</h2>
     <p class="lead">Формулы с подстановкой чисел для каждого коэффициента и года. В Word они стоят прямо перед таблицами 2.8, 2.9 и 2.10 — как в образце.</p>
     <div class="calc" id="calc"></div>
+  </section>
+
+  <section class="step" id="fr" data-pane="fr" hidden>
+    <h2><span class="n">₽</span>Анализ финансовых результатов</h2>
+    <p class="lead">Считается по отчету о финансовых результатах (форма 2) и балансу (строки 1600 и 1300) — по тем же данным, что на первой вкладке: загрузить или поправить цифры можно там, в разделах 1–2. Значения в тыс. руб.; расходы показаны положительными числами.</p>
+    <div class="msg" id="frNotes"></div>
+    <nav class="toc" id="frToc" aria-label="Список таблиц"></nav>
+    <div id="frOut"></div>
   </section>
 </div>
 
@@ -106,6 +120,7 @@
 <script src="js/formulas.js"></script>
 <script src="js/docstyle.js"></script>
 <script src="js/export.js"></script>
+<script src="js/finres.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>
