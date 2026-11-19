@@ -74,7 +74,8 @@ function showPane(p){
     else el.hidden = el.dataset.pane!==p;
   });
   try{ localStorage.setItem('fua-pane', p); }catch(e){}
-  if (p==='main') drawCharts();   // графики Chart.js не рисуются в скрытом блоке — перерисовываем при возврате
+  // графики Chart.js не рисуются в скрытом блоке — перерисовываем при открытии вкладки
+  if (p==='main') drawCharts(); else drawFrCharts();
 }
 document.getElementById('mainTabs').addEventListener('click',e=>{
   const b=e.target.closest('button[data-pane]'); if(!b) return;

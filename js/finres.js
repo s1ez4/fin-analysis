@@ -179,30 +179,35 @@ function frT3(D){
     notes};
 }
 
-/* ===================== Таблица 4. Рентабельность ===================== */
+/* ===================== Таблица 4. Рентабельность (8 показателей) ===================== */
 function frRent(D){
   return D.map((d, i) => {
     if (!d) return null;
-    const A = avgBal('1600', i), K = avgBal('1300', i);
-    const costs = d.C + d.KR + d.UR;
+    // средние величины за год: (на начало + на конец) / 2
+    const A = avgBal('1600', i), K = avgBal('1300', i), OA = avgBal('1200', i), VOA = avgBal('1100', i);
+    const NP = d.R['2400'];
     return {
-      gross: d.B ? d.R['2100'] / d.B * 100 : null,
-      sales: d.B ? d.R['2200'] / d.B * 100 : null,
-      net:   d.B ? d.R['2400'] / d.B * 100 : null,
-      cost:  costs ? d.R['2200'] / costs * 100 : null,
-      roa:   A.x ? d.R['2400'] / A.x * 100 : null,
-      roe:   K.x > 0 ? d.R['2400'] / K.x * 100 : null,   // при отрицательном капитале ROE не имеет смысла
-      A, K,
+      roe:      K.x > 0 ? NP / K.x * 100 : null,          // при отрицательном капитале ROE не имеет смысла
+      roa:      A.x ? NP / A.x * 100 : null,
+      roca:     OA.x ? NP / OA.x * 100 : null,
+      rnca:     VOA.x ? NP / VOA.x * 100 : null,
+      prod:     d.C ? d.R['2200'] / d.C * 100 : null,
+      netSales: d.B ? NP / d.B * 100 : null,
+      sales:    d.B ? d.R['2200'] / d.B * 100 : null,
+      roaEbt:   A.x ? d.R['2300'] / A.x * 100 : null,
+      A, K, OA, VOA,
     };
   });
 }
 const RENT_DEFS = [
-  ['gross', 'Валовая рентабельность', 'ВП / В'],
-  ['sales', 'Рентабельность продаж', 'Пп / В'],
-  ['net',   'Рентабельность по чистой прибыли', 'ПЧ / В'],
-  ['cost',  'Рентабельность затрат', 'Пп / (С + КР + УР)'],
-  ['roa',   'Рентабельность активов (ROA)', 'ПЧ / ср. активы (1600)'],
-  ['roe',   'Рентабельность собственного капитала (ROE)', 'ПЧ / ср. СК (1300)'],
+  ['roe',      'Рентабельность собственного капитала (ROE)', 'ЧП / ср. СК (1300)'],
+  ['roa',      'Рентабельность авансированного капитала (всех активов, ROA)', 'ЧП / ср. активы (1600)'],
+  ['roca',     'Рентабельность оборотных активов', 'ЧП / ср. оборотные активы (1200)'],
+  ['rnca',     'Рентабельность внеоборотных активов', 'ЧП / ср. внеоборотные активы (1100)'],
+  ['prod',     'Рентабельность производства', '2200 / 2120'],
+  ['netSales', 'Рентабельность продаж по чистой прибыли', '2400 / 2110'],
+  ['sales',    'Рентабельность продаж по прибыли от продаж', '2200 / 2110'],
+  ['roaEbt',   'Рентабельность активов по прибыли до налогообложения', '2300 / ср. активы (1600)'],
 ];
 function frT4(D){
   const P = pairs(), R = frRent(D);
@@ -216,14 +221,178 @@ function frT4(D){
   });
   const notes = [];
   const endOnly = R.map((r, i) => r && r.A.how === 'end' ? i : -1).filter(i => i >= 0);
-  if (endOnly.length) notes.push(`За ${endOnly.map(Y).join(', ')} г. нет баланса на начало года (31.12 прошлого года) — для ROA и ROE взята величина активов и капитала на конец года.`);
+  if (endOnly.length) notes.push(`За ${endOnly.map(Y).join(', ')} г. нет баланса на начало года (31.12 прошлого года) — средние величины активов, капитала, оборотных и внеоборотных активов взяты на конец года.`);
   const noBal = R.map((r, i) => r && r.A.how === 'none' ? i : -1).filter(i => i >= 0);
-  if (noBal.length) notes.push(`За ${noBal.map(Y).join(', ')} г. нет баланса — ROA и ROE не рассчитаны.`);
+  if (noBal.length) notes.push(`За ${noBal.map(Y).join(', ')} г. нет баланса — показатели по активам и капиталу не рассчитаны.`);
   const negK = R.map((r, i) => r && r.K.x != null && r.K.x <= 0 ? i : -1).filter(i => i >= 0);
   if (negK.length) notes.push(`За ${negK.map(Y).join(', ')} г. собственный капитал отрицательный — ROE не рассчитывается.`);
   return {id:'fr4', num:'4', title:'Показатели рентабельности, %', head, rows, ncols:2 + nYears() + P.length, R,
-    formula:'Rвал = ВП / В; Rпрод = Пп / В; Rчп = ПЧ / В; Rзатр = Пп / (С + КР + УР); ROA = ПЧ / ((стр. 1600 на начало + на конец года) / 2); ROE = ПЧ / ((стр. 1300 на начало + на конец года) / 2); всё × 100%, отклонение — в процентных пунктах.',
+    formula:'ROE = ЧП / ср. СК; ROA = ЧП / ср. активы; Rоа = ЧП / ср. оборотные активы; Rвна = ЧП / ср. внеоборотные активы; Rпроизв = Пп / С; Rпрод(ЧП) = ЧП / В; Rпрод(Пп) = Пп / В; Rа(Пнобл) = Пнобл / ср. активы; средняя = (на начало года + на конец года) / 2; всё × 100%, отклонение — в п. п.',
     notes};
+}
+
+/* ===================== Общий вид таблицы «по парам лет» (таблицы 5 и 7) ===================== */
+// spec: [название, fn(j, i) → число, {dev, chk, t, k, d, tol}] или {sec:'текст'}
+function pairTable(id, num, title, spec, formula, notes, extra={}){
+  const P = pairs();
+  const head = [[{t:'Показатель'}, ...P.map(i => ({t:pairLabel(i)}))]];
+  const rows = spec.map(r => {
+    if (r.sec) return {sec:true, cells:[T(r.sec)]};
+    const [name, fn, o={}] = r, k = o.k || 'num', d = o.d || 0;
+    return {t:o.t, cells:[T(name), ...P.map((i, j) => {
+      const val = fn(j, i);
+      if (o.chk) return {...N(val, k, d), x: val != null && Math.abs(val) < (o.tol || 1) ? 'okv' : 'warn'};
+      return o.dev ? Dv(val, k, d) : N(val, k, d);
+    })]};
+  });
+  return {id, num, title, head, rows, ncols:1 + P.length, formula, notes, ...extra};
+}
+
+/* ===================== Таблица 5. Факторы изменения чистой прибыли ===================== */
+function frNpFactors(a, b){
+  if (!a || !b) return null;
+  const fin = d => d.o2310 + d.o2320 - d.o2330, oth = d => d.o2340 - d.o2350;
+  const f = {
+    fPP:   b.R['2200'] - a.R['2200'],
+    fFin:  fin(b) - fin(a),
+    fOth:  oth(b) - oth(a),
+    fTax:  -(b.TAX - a.TAX),          // рост налога уменьшает прибыль — знак обратный
+    f2460: b.P2460 - a.P2460,
+  };
+  f.sum = f.fPP + f.fFin + f.fOth + f.fTax + f.f2460;
+  f.dNP = b.R['2400'] - a.R['2400'];
+  f.check = f.sum - f.dNP;
+  return f;
+}
+const NP_FACTOR_NAMES = {fPP:'изменение прибыли от продаж', fFin:'изменение сальдо доходов от участия и процентов', fOth:'изменение сальдо прочих доходов и расходов', fTax:'изменение налога на прибыль', f2460:'изменение прочих статей (стр. 2460)'};
+function frT5(D){
+  const F = pairs().map(i => frNpFactors(D[i - 1], D[i]));
+  const g = (j, key) => F[j] ? F[j][key] : null;
+  const spec = [
+    ['Чистая прибыль прошлого года (ЧП₀)', (j, i) => D[i - 1] ? D[i - 1].R['2400'] : null],
+    ['Чистая прибыль отчетного года (ЧП₁)', (j, i) => D[i] ? D[i].R['2400'] : null],
+    ['Изменение чистой прибыли (Δ2400)', j => g(j, 'dNP'), {dev:1, t:1}],
+    {sec:'Влияние факторов на изменение чистой прибыли, тыс. руб.'},
+    ['Изменение прибыли от продаж (Δ2200)', j => g(j, 'fPP'), {dev:1}],
+    ['Сальдо доходов от участия и процентов, Δ(2310 + 2320 − 2330)', j => g(j, 'fFin'), {dev:1}],
+    ['Сальдо прочих доходов и расходов, Δ(2340 − 2350)', j => g(j, 'fOth'), {dev:1}],
+    ['Налог на прибыль, −Δ2410', j => g(j, 'fTax'), {dev:1}],
+    ['Прочие статьи, Δ2460', j => g(j, 'f2460'), {dev:1}],
+    ['Итого влияние факторов', j => g(j, 'sum'), {dev:1, t:2}],
+    ['Проверка: итог − Δ2400, должно быть 0', j => g(j, 'check'), {chk:1}],
+  ];
+  const notes = ['Строка 2460 «Прочее» добавлена к четырем факторам задания: в отчете ЧП = Пнобл − 2410 + 2460, без нее итог не совпал бы с Δ2400.',
+    'Налог на прибыль 2410 учитывается целиком (текущий + отложенный); его рост уменьшает прибыль, поэтому влияние берется с обратным знаком.'];
+  return pairTable('fr5', '5', 'Факторы изменения чистой прибыли', spec,
+    'Влияние Пп = Δ2200; сальдо участия и процентов = Δ(2310 + 2320 − 2330); сальдо прочих = Δ(2340 − 2350); налога = −Δ2410; прочих статей = Δ2460; итог = сумма влияний = Δ2400.',
+    notes, {F});
+}
+
+/* ===================== Таблицы 6–7. Модель Дюпона ===================== */
+// ROE = (ЧП / В) × (В / ср. активы) × (ср. активы / ср. СК)
+function frDupont(D){
+  return D.map((d, i) => {
+    if (!d) return null;
+    const A = avgBal('1600', i), K = avgBal('1300', i);
+    if (!d.B || !A.x || !(K.x > 0)) return {a:null, b:null, c:null, roe:null, negK: K.x != null && K.x <= 0};
+    const a = d.R['2400'] / d.B * 100, b = d.B / A.x, c = A.x / K.x;
+    return {a, b, c, roe:a * b * c};
+  });
+}
+function frT6(D){
+  const P = pairs(), M = frDupont(D);
+  const head = [
+    [{t:'Показатель', rs:2}, {t:'Формула', rs:2}, {t:'Значение', cs:nYears()}, {t:'Отклонение', cs:P.length}],
+    [...state.years.map(y => ({t:y + ' г.'})), ...P.map(i => ({t:pairLabel(i)}))],
+  ];
+  const defs = [
+    ['a', 'a — рентабельность продаж по чистой прибыли, %', 'ЧП / В × 100', 'pct', 2],
+    ['b', 'b — оборачиваемость активов, раз', 'В / ср. активы', 'r', 3],
+    ['c', 'c — мультипликатор капитала, раз', 'ср. активы / ср. СК', 'r', 3],
+    ['roe', 'ROE = a × b × c, %', 'рентабельность × оборачиваемость × мультипликатор', 'pct', 2],
+  ];
+  const rows = defs.map(([key, name, f, k, d]) => {
+    const x = M.map(m => m ? m[key] : null);
+    return {t:key === 'roe' ? 2 : 0, cells:[T(name), T(f), ...x.map(a => N(a, k, d)), ...P.map(i => Dv(x[i] != null && x[i - 1] != null ? x[i] - x[i - 1] : null, k, d))]};
+  });
+  const notes = [];
+  const neg = M.map((m, i) => m && m.negK ? i : -1).filter(i => i >= 0);
+  if (neg.length) notes.push(`За ${neg.map(Y).join(', ')} г. собственный капитал отрицательный — модель Дюпона не рассчитывается.`);
+  notes.push('ROE по модели совпадает с ROE из таблицы 4: средние активы в произведении сокращаются. Отклонение по ROE и рентабельности — в п. п., по оборачиваемости и мультипликатору — в разах.');
+  return {id:'fr6', num:'6', title:'Модель Дюпона: факторы рентабельности собственного капитала', head, rows, ncols:2 + nYears() + P.length, M,
+    formula:'ROE = (ЧП / В) × (В / ср. активы) × (ср. активы / ср. СК) = рентабельность продаж × оборачиваемость активов × мультипликатор капитала.',
+    notes};
+}
+function frDupontChain(m0, m1){
+  if (!m0 || !m1 || m0.roe == null || m1.roe == null) return null;
+  // цепные подстановки: сначала меняем a, затем b, затем c
+  const fa = (m1.a - m0.a) * m0.b * m0.c;
+  const fb = m1.a * (m1.b - m0.b) * m0.c;
+  const fc = m1.a * m1.b * (m1.c - m0.c);
+  const sum = fa + fb + fc, dROE = m1.roe - m0.roe;
+  return {fa, fb, fc, sum, dROE, check:sum - dROE};
+}
+const DUPONT_NAMES = {fa:'рентабельность продаж по чистой прибыли', fb:'оборачиваемость активов', fc:'мультипликатор капитала'};
+function frT7(D, t6){
+  const M = t6.M, F = pairs().map(i => frDupontChain(M[i - 1], M[i]));
+  const g = (j, key) => F[j] ? F[j][key] : null, o = {k:'pct', d:2};
+  const spec = [
+    ['ROE прошлого года (ROE₀), %', (j, i) => M[i - 1] ? M[i - 1].roe : null, o],
+    ['ROE отчетного года (ROE₁), %', (j, i) => M[i] ? M[i].roe : null, o],
+    ['Изменение ROE (ΔROE), п. п.', j => g(j, 'dROE'), {...o, dev:1, t:1}],
+    {sec:'Влияние факторов (цепные подстановки), п. п.'},
+    ['Рентабельности продаж по ЧП: (a₁ − a₀) × b₀ × c₀', j => g(j, 'fa'), {...o, dev:1}],
+    ['Оборачиваемости активов: a₁ × (b₁ − b₀) × c₀', j => g(j, 'fb'), {...o, dev:1}],
+    ['Мультипликатора капитала: a₁ × b₁ × (c₁ − c₀)', j => g(j, 'fc'), {...o, dev:1}],
+    ['Итого влияние факторов', j => g(j, 'sum'), {...o, dev:1, t:2}],
+    ['Проверка: итог − ΔROE, должно быть 0', j => g(j, 'check'), {...o, chk:1, tol:0.005}],
+  ];
+  const notes = [];
+  if (F.some(f => !f)) notes.push('Для пар лет, где модель Дюпона не рассчитана хотя бы за один год, разложение не выполняется.');
+  return pairTable('fr7', '7', 'Разложение изменения ROE по модели Дюпона (цепные подстановки)', spec,
+    'ΔROE(a) = (a₁ − a₀) × b₀ × c₀; ΔROE(b) = a₁ × (b₁ − b₀) × c₀; ΔROE(c) = a₁ × b₁ × (c₁ − c₀); итог = ΔROE(a) + ΔROE(b) + ΔROE(c) = ROE₁ − ROE₀ (a — рентабельность продаж по ЧП, b — оборачиваемость активов, c — мультипликатор капитала).',
+    notes, {F});
+}
+
+/* ===================== Графики вкладки (Chart.js — та же библиотека и оформление, что на первой вкладке) ===================== */
+let frCharts = [], frChartGen = 0;
+function frChartData(D, R){
+  const idx = state.years.map((_, i) => i).filter(i => D[i]);
+  return {
+    idx,
+    bars:[['Выручка', i => D[i].B], ['Прибыль от продаж', i => D[i].R['2200']], ['Чистая прибыль', i => D[i].R['2400']]],
+    lines:[['Рентабельность продаж по Пп', i => R[i].sales], ['Рентабельность продаж по ЧП', i => R[i].netSales],
+      ['Рентабельность производства', i => R[i].prod], ['ROA', i => R[i].roa], ['ROE', i => R[i].roe]],
+  };
+}
+function frLineConfig(idx, series, th){
+  const pal = PALETTE[th.mode], font = {family:th.font, size:12};
+  return {
+    type:'line',
+    data:{labels:idx.map(i => String(Y(i))), datasets:series.map(([name, fn], k) => ({label:name, data:idx.map(fn),
+      borderColor:pal.cat[k], backgroundColor:pal.cat[k], borderWidth:2, pointRadius:4, pointHoverRadius:6, tension:0}))},
+    plugins:[bgPlugin],
+    options:{responsive:true, maintainAspectRatio:false, animation:false,
+      layout:{padding:{top:18, right:12, left:4, bottom:4}},
+      scales:{x:{offset:true, grid:{display:false}, border:{color:th.axis}, ticks:{color:th.soft, font}},
+        y:{grid:{color:th.grid}, border:{display:false}, ticks:{color:th.soft, font, callback:x => fmtNum(x, 0) + '%'}}},
+      plugins:{bgFill:{color:th.surface},
+        legend:{position:'bottom', labels:{color:th.ink, font, boxWidth:12, boxHeight:12, padding:14}},
+        tooltip:{titleFont:font, bodyFont:font, callbacks:{label:it => `${it.dataset.label}: ${it.raw == null ? '—' : fmtNum(it.raw, 2) + '%'}`}}}},
+  };
+}
+async function drawFrCharts(){
+  const sec = document.getElementById('fr'); if (!sec || sec.hidden) return;   // в скрытом блоке Chart.js рисует нулевой размер
+  const gen = ++frChartGen;
+  try{ await loadScript(CHART_URL); }
+  catch(e){ document.querySelectorAll('#fr .chartbox').forEach(el => el.innerHTML = '<p class="hint">График не загрузился: для Chart.js нужен интернет.</p>'); return; }
+  if (gen !== frChartGen) return;
+  frCharts.forEach(c => c.destroy()); frCharts = [];
+  const D = frAll(), C = frChartData(D, frRent(D)), th = chartTheme(false);
+  if (!C.idx.length) return;
+  const cb = document.querySelector('#frFigBars canvas'), cl = document.querySelector('#frFigLines canvas');
+  if (cb) frCharts.push(new Chart(cb, chartConfig({kind:'bars', unit:'млн руб.', idx:C.idx, series:C.bars}, th, false)));
+  if (cl) frCharts.push(new Chart(cl, frLineConfig(C.idx, C.lines, th)));
 }
 
 /* ===================== Пометки о данных ===================== */
@@ -260,7 +429,7 @@ function rentText(name, a, b){
   const d = b - a;
   return `${name} ${Math.abs(d) < 0.005 ? 'не изменилась' : d > 0 ? 'выросла' : 'снизилась'} с ${fmtNum(a, 2)}% до ${fmtNum(b, 2)}%${Math.abs(d) < 0.005 ? '' : ` (на ${fmtNum(Math.abs(d), 2)} п. п.)`}`;
 }
-function frConclusions(D, t3, t4){
+function frConclusions(D, t3, t4, t5, t7){
   const out = [];   // [{h, ps:[...]}]
   const P = pairs().filter(i => D[i] && D[i - 1]);
   if (!P.length){ out.push({h:'Выводы', ps:['Для выводов нужен отчет о финансовых результатах минимум за два соседних года.']}); return out; }
@@ -293,16 +462,38 @@ function frConclusions(D, t3, t4){
   });
   if (fac.length) out.push({h:'Влияние факторов на прибыль от продаж', ps:fac});
 
-  // 3. Рентабельность — за последний период
+  // 3. Факторы чистой прибыли — какой сильнее всего изменил ЧП (по модулю)
+  const npf = [];
+  pairs().forEach((i, k) => {
+    const F = t5.F[k]; if (!F) return;
+    const top = Object.keys(NP_FACTOR_NAMES).map(key => [key, F[key]]).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))[0];
+    npf.push(`Чистая прибыль в ${Y(i)} г. изменилась на ${sgn(F.dNP)} тыс. руб. Сильнее всего на нее повлияло ${NP_FACTOR_NAMES[top[0]]} (${sgn(top[1])} тыс. руб.)${top[1] >= 0 ? ' — фактор увеличил прибыль' : ' — фактор уменьшил прибыль'}. Сумма влияний совпадает с изменением чистой прибыли.`);
+  });
+  if (npf.length) out.push({h:'Влияние факторов на чистую прибыль', ps:npf});
+
+  // 4. Модель Дюпона — какой фактор сильнее всего изменил ROE
+  const dp = [];
+  pairs().forEach((i, k) => {
+    if (!D[i] || !D[i - 1]) return;
+    const F = t7.F[k];
+    if (!F){ dp.push(`Разложение ROE за ${Y(i)} г. по модели Дюпона не выполнено: собственный капитал отрицательный или нет данных баланса.`); return; }
+    const items = Object.keys(DUPONT_NAMES).map(key => [key, F[key]]).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
+    const [top] = items;
+    dp.push(`ROE в ${Y(i)} г. ${F.dROE >= 0 ? 'выросла' : 'снизилась'} на ${fmtNum(Math.abs(F.dROE), 2)} п. п. Сильнее всего ROE изменил фактор «${DUPONT_NAMES[top[0]]}» (${top[1] >= 0 ? '+' : '−'}${fmtNum(Math.abs(top[1]), 2)} п. п.); влияние остальных: ` +
+      items.slice(1).map(([key, x]) => `${DUPONT_NAMES[key]} ${x >= 0 ? '+' : '−'}${fmtNum(Math.abs(x), 2)} п. п`).join(', ') + '.');
+  });
+  if (dp.length) out.push({h:'Модель Дюпона', ps:dp});
+
+  // 5. Рентабельность — за последний период
   const L = P.at(-1), r0 = t4.R[L - 1], r1 = t4.R[L];
-  const rs = [rentText('рентабельность продаж', r0.sales, r1.sales), rentText('рентабельность активов (ROA)', r0.roa, r1.roa),
-    rentText('рентабельность собственного капитала (ROE)', r0.roe, r1.roe)].filter(Boolean);
+  const rs = [rentText('рентабельность продаж по прибыли от продаж', r0.sales, r1.sales), rentText('рентабельность продаж по чистой прибыли', r0.netSales, r1.netSales),
+    rentText('рентабельность активов (ROA)', r0.roa, r1.roa), rentText('рентабельность собственного капитала (ROE)', r0.roe, r1.roe)].filter(Boolean);
   if (rs.length) out.push({h:'Рентабельность', ps:[`В ${Y(L)} г. по сравнению с ${Y(L - 1)} г. ` + rs.join('; ') + '.']});
 
-  // 4. Резервы роста прибыли — за последний период
+  // 6. Резервы роста прибыли — за последний период
   const a = D[L - 1], b = D[L], res = []; let total = 0;
   if (a.B && b.B){
-    for (const [key, name, gen] of [['C', 'себестоимости', 'себестоимости'], ['KR', 'коммерческих расходов', 'коммерческих расходов'], ['UR', 'управленческих расходов', 'управленческих расходов']]){
+    for (const [key, name] of [['C', 'себестоимости'], ['KR', 'коммерческих расходов'], ['UR', 'управленческих расходов']]){
       const s0 = a[key] / a.B, s1 = b[key] / b.B;
       if (s1 > s0){
         const x = (s1 - s0) * b.B; total += x;
@@ -321,26 +512,38 @@ function frConclusions(D, t3, t4){
 /* ===================== Рендер вкладки ===================== */
 function frBuild(){
   const D = frAll();
-  const t3 = frT3(D), t4 = frT4(D);
-  return {D, tables:[frT1(D), frT2(D), t3, t4], concl:frConclusions(D, t3, t4), dataNotes:frDataNotes(D)};
+  const t3 = frT3(D), t4 = frT4(D), t5 = frT5(D), t6 = frT6(D), t7 = frT7(D, t6);
+  return {D, tables:[frT1(D), frT2(D), t3, t4, t5, t6, t7], concl:frConclusions(D, t3, t4, t5, t7), dataNotes:frDataNotes(D)};
 }
+// Рисунки стоят после таблиц: 1 — после таблицы 1, 2 — после таблицы 4
+const FR_FIGS = [
+  {id:'frFigBars', after:'fr1', num:1, title:'Динамика выручки, прибыли от продаж и чистой прибыли, млн руб.'},
+  {id:'frFigLines', after:'fr4', num:2, title:'Динамика основных показателей рентабельности, %'},
+];
 function renderFR(){
   const box = document.getElementById('frOut'); if (!box) return;
   const M = frBuild();
   const notesEl = document.getElementById('frNotes');
   notesEl.innerHTML = M.dataNotes.length ? '<b>Пометки к данным</b><ul>' + M.dataNotes.map(s => `<li>${esc(s)}</li>`).join('') + '</ul>' : '';
-  document.getElementById('frToc').innerHTML = M.tables.map(t => `<a href="#${t.id}">Таблица ${t.num}</a>`).join('') + '<a href="#frConcl">Выводы и резервы</a>';
+  document.getElementById('frToc').innerHTML = M.tables.map(t => `<a href="#${t.id}">Таблица ${t.num}</a>`).join('') +
+    FR_FIGS.map(f => `<a href="#${f.id}">Рисунок ${f.num}</a>`).join('') + '<a href="#frConcl">Выводы и резервы</a>';
+  const fig = id => FR_FIGS.filter(f => f.after === id).map(f => `
+    <figure class="chart" id="${f.id}">
+      <div class="chartbox"><canvas role="img" aria-label="Рисунок ${f.num} – ${esc(f.title)}"></canvas></div>
+      <figcaption>Рисунок ${f.num} – ${esc(f.title)}</figcaption>
+    </figure>`).join('');
   box.innerHTML = M.tables.map(t => `
     <figure class="tbl" id="${t.id}">
       <figcaption>Таблица ${t.num} – ${esc(t.title)}</figcaption>
       <div class="scroll">${tableHTML(t)}</div>
       <p class="formula"><b>Формулы:</b> ${esc(t.formula)}</p>
       ${t.notes.length ? `<ul class="tnotes">${t.notes.map(s => `<li>${esc(s)}</li>`).join('')}</ul>` : ''}
-    </figure>`).join('') +
+    </figure>${fig(t.id)}`).join('') +
     `<figure class="tbl" id="frConcl"><figcaption>Выводы и резервы роста прибыли</figcaption>
       <div class="frconcl">${M.concl.map(b => `<h3>${esc(b.h)}</h3>${b.ps.map(p => `<p>${esc(p)}</p>`).join('')}`).join('')}</div>
-      <p class="formula">Текст собирается автоматически по правилам из цифр таблиц 1–4 (без нейросетей) и обновляется при изменении данных.</p>
+      <p class="formula">Текст собирается автоматически по правилам из цифр таблиц 1–7 (без нейросетей) и обновляется при изменении данных.</p>
     </figure>`;
+  drawFrCharts();
 }
 
 /* ===================== Выгрузка вкладки в Excel ===================== */
@@ -364,19 +567,92 @@ function frSheet(t){
   aoa.push([], ['Формулы: ' + t.formula]);
   for (const s of t.notes) aoa.push([s]);
   const ws = XL.utils.aoa_to_sheet(aoa); ws['!merges'] = merges;
-  ws['!cols'] = [{wch:46}, ...Array(t.ncols - 1).fill(0).map((_, j) => ({wch:j === 0 && t.id !== 'fr3' ? 22 : 14}))];
+  const pairOnly = ['fr3', 'fr5', 'fr7'].includes(t.id);   // у таблиц «по парам лет» нет колонки формулы/кода
+  ws['!cols'] = [{wch:pairOnly ? 60 : 46}, ...Array(t.ncols - 1).fill(0).map((_, j) => ({wch:j === 0 && !pairOnly ? 24 : 14}))];
   return ws;
 }
-document.getElementById('dlFr').onclick = async () => {
+// Лист «Графики»: данные для обоих рисунков; сами рисунки вставляются ниже картинками (см. addImagesToXlsx)
+function frChartSheet(M){
+  const XL = window.XLSX, C = frChartData(M.D, M.tables[3].R);
+  const num = (x, d) => x == null || !Number.isFinite(x) ? '-' : {t:'n', v:Math.round(x * 10 ** d) / 10 ** d, z:d ? '#,##0.' + '0'.repeat(d) : '#,##0'};
+  const aoa = [['Данные для рисунка 1 — ' + FR_FIGS[0].title.replace(', млн руб.', '') + ', тыс. руб.'],
+    ['Год', ...C.bars.map(s => s[0])], ...C.idx.map(i => [Y(i), ...C.bars.map(s => num(s[1](i), 0))]), [],
+    ['Данные для рисунка 2 — ' + FR_FIGS[1].title],
+    ['Год', ...C.lines.map(s => s[0])], ...C.idx.map(i => [Y(i), ...C.lines.map(s => num(s[1](i), 2))]), []];
+  aoa.push(['Рисунки 1 и 2 вставлены ниже картинками (если их не видно — откройте файл в Excel; данные выше позволяют построить графики заново: Вставка → Диаграмма).']);
+  const ws = XL.utils.aoa_to_sheet(aoa); ws['!cols'] = [{wch:12}, ...Array(6).fill({wch:26})];
+  return ws;
+}
+// PNG рисунков в светлой теме (как для Word), 800×400 ×2
+async function frChartPngs(){
+  await loadScript(CHART_URL);
+  const D = frAll(), C = frChartData(D, frRent(D)), th = chartTheme(true), out = [];
+  if (!C.idx.length) return out;
+  const box = document.createElement('div'); box.style.cssText = 'position:fixed;left:-10000px;top:0;width:800px;height:400px;';
+  document.body.appendChild(box);
   try{
-    await loadScript(XLSX_URL); const XL = window.XLSX, wb = XL.utils.book_new(), M = frBuild();
-    const names = ['1 Динамика ФР', '2 Цепочка прибыли', '3 Факторный анализ', '4 Рентабельность'];
-    M.tables.forEach((t, k) => XL.utils.book_append_sheet(wb, frSheet(t), names[k]));
-    const aoa = [[`Выводы и резервы роста прибыли — ${state.company || 'организация'}, ${state.years[0]}–${state.years.at(-1)} гг.`]];
-    for (const b of M.concl){ aoa.push([], [b.h]); for (const p of b.ps) aoa.push([p]); }
-    if (M.dataNotes.length){ aoa.push([], ['Пометки к данным']); for (const s of M.dataNotes) aoa.push([s]); }
-    const ws = XL.utils.aoa_to_sheet(aoa); ws['!cols'] = [{wch:140}];
-    XL.utils.book_append_sheet(wb, ws, 'Выводы');
-    await offer(`Финрезультаты_${fileBase()}.xlsx`, new Blob([XL.write(wb, {bookType:'xlsx', type:'array'})]));
-  }catch(e){ msg('Ошибка при сборке Excel: ' + e.message, true); status('Ошибка при сборке Excel'); }
+    const cfgs = [chartConfig({kind:'bars', unit:'млн руб.', idx:C.idx, series:C.bars}, th, true), frLineConfig(C.idx, C.lines, th)];
+    const lc = cfgs[1].options; lc.responsive = false; lc.devicePixelRatio = 2;
+    lc.scales.x.ticks.font = lc.scales.y.ticks.font = lc.plugins.legend.labels.font = {family:th.font, size:14};
+    for (const cfg of cfgs){
+      const cv = document.createElement('canvas'); cv.width = 800; cv.height = 400; box.appendChild(cv);
+      const ch = new Chart(cv, cfg);
+      const blob = await new Promise(r => cv.toBlob(r, 'image/png'));
+      out.push(new Uint8Array(await blob.arrayBuffer()));
+      ch.destroy(); cv.remove();
+    }
+  } finally { box.remove(); }
+  return out;
+}
+// Дописывает картинки в готовый .xlsx (SheetJS бесплатной версии картинки не пишет): media + drawing + связи
+async function addImagesToXlsx(buf, sheetNo, pngs, row0){
+  await loadScript(JSZIP_URL);
+  const zip = await JSZip.loadAsync(buf), EMU = 9525, W = 760 * EMU, H = 380 * EMU;
+  pngs.forEach((png, k) => zip.file(`xl/media/frchart${k + 1}.png`, png));
+  const anchors = pngs.map((_, k) => `<xdr:oneCellAnchor><xdr:from><xdr:col>0</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${row0 + k * 21}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:ext cx="${W}" cy="${H}"/>` +
+    `<xdr:pic><xdr:nvPicPr><xdr:cNvPr id="${k + 2}" name="Рисунок ${k + 1}"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr>` +
+    `<xdr:blipFill><a:blip r:embed="rIdImg${k + 1}"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill>` +
+    `<xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${W}" cy="${H}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor>`).join('');
+  zip.file('xl/drawings/drawing1.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">${anchors}</xdr:wsDr>`);
+  zip.file('xl/drawings/_rels/drawing1.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">` +
+    pngs.map((_, k) => `<Relationship Id="rIdImg${k + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/frchart${k + 1}.png"/>`).join('') + '</Relationships>');
+  // связь листа с рисунком
+  const relPath = `xl/worksheets/_rels/sheet${sheetNo}.xml.rels`, rel = '<Relationship Id="rIdDrw1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing1.xml"/>';
+  const oldRels = zip.file(relPath) ? await zip.file(relPath).async('string') : null;
+  zip.file(relPath, oldRels ? oldRels.replace('</Relationships>', rel + '</Relationships>')
+    : `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${rel}</Relationships>`);
+  const shPath = `xl/worksheets/sheet${sheetNo}.xml`;
+  let sh = await zip.file(shPath).async('string');
+  if (!/xmlns:r=/.test(sh)) sh = sh.replace('<worksheet ', '<worksheet xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" ');
+  zip.file(shPath, sh.replace('</worksheet>', '<drawing r:id="rIdDrw1"/></worksheet>'));
+  let ct = await zip.file('[Content_Types].xml').async('string');
+  if (!/Extension="png"/.test(ct)) ct = ct.replace('<Default ', '<Default Extension="png" ContentType="image/png"/><Default ');
+  ct = ct.replace('</Types>', '<Override PartName="/xl/drawings/drawing1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/></Types>');
+  zip.file('[Content_Types].xml', ct);
+  return zip.generateAsync({type:'blob', mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+}
+async function buildFrXlsx(){
+  await loadScript(XLSX_URL); const XL = window.XLSX, wb = XL.utils.book_new(), M = frBuild();
+  const names = ['1 Динамика ФР', '2 Цепочка прибыли', '3 Факторы Пп', '4 Рентабельность', '5 Факторы ЧП', '6 Модель Дюпона', '7 Разложение ROE'];
+  M.tables.forEach((t, k) => XL.utils.book_append_sheet(wb, frSheet(t), names[k]));
+  const chartsWs = frChartSheet(M);
+  XL.utils.book_append_sheet(wb, chartsWs, 'Графики');
+  const chartSheetNo = wb.SheetNames.length;   // SheetJS нумерует листы по порядку: sheet1.xml, sheet2.xml, …
+  const aoa = [[`Выводы и резервы роста прибыли — ${state.company || 'организация'}, ${state.years[0]}–${state.years.at(-1)} гг.`]];
+  for (const b of M.concl){ aoa.push([], [b.h]); for (const p of b.ps) aoa.push([p]); }
+  if (M.dataNotes.length){ aoa.push([], ['Пометки к данным']); for (const s of M.dataNotes) aoa.push([s]); }
+  const ws = XL.utils.aoa_to_sheet(aoa); ws['!cols'] = [{wch:140}];
+  XL.utils.book_append_sheet(wb, ws, 'Выводы');
+  const buf = XL.write(wb, {bookType:'xlsx', type:'array'});
+  // картинки графиков: если Chart.js или JSZip не загрузились — файл без картинок, но с данными
+  try{
+    const pngs = await frChartPngs();
+    const row0 = XL.utils.decode_range(chartsWs['!ref']).e.r + 2;
+    if (pngs.length) return await addImagesToXlsx(buf, chartSheetNo, pngs, row0);
+  }catch(e){ status('Графики в Excel не добавлены: ' + e.message); }
+  return new Blob([buf]);
+}
+document.getElementById('dlFr').onclick = async () => {
+  try{ status('Собираю Excel…'); await offer(`Финрезультаты_${fileBase()}.xlsx`, await buildFrXlsx()); }
+  catch(e){ msg('Ошибка при сборке Excel: ' + e.message, true); status('Ошибка при сборке Excel'); }
 };
