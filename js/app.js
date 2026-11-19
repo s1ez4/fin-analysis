@@ -62,6 +62,8 @@ function renderOut(){
 // Единая шапка: компания и выбранные годы (видна на обеих вкладках)
 function renderCtx(){
   document.getElementById('ctx').textContent = (state.company||'Организация не указана')+' · '+state.years[0]+'–'+state.years[nYears()-1]+' гг.';
+  // подсветить выбранную компанию в переключателе
+  document.querySelectorAll('#coSel button').forEach(b=>b.setAttribute('aria-pressed', EXAMPLES[+b.dataset.co].company===state.company));
 }
 
 /* ===================== Вкладки: «Анализ отчетности» / «Анализ финансовых результатов» ===================== */
@@ -193,6 +195,21 @@ document.getElementById('hideZero').addEventListener('change',renderOut);
 // рисунок выручки и прибыли: в образце его нет, поэтому его можно выключить (номера рисунков пересчитаются)
 document.getElementById('revChart').addEventListener('change',e=>{ state.revChart=e.target.checked; renderOut(); save(); });
 // Кнопки примеров: data-example — номер в EXAMPLES (0 — НКНХ, 1 — Россети Северный Кавказ)
+// Переключатель компаний (НКНХ / Россети СК) в верхней панели — действует на все расчеты обеих вкладок.
+// Данные каждой компании (с вашими правками и выводами) запоминаются отдельно, поэтому при переключении
+// туда-обратно ничего не теряется; при первом выборе берется встроенный пример.
+const CO_STORE='fua-companies-v1';
+function selectCompany(k){
+  const ex=EXAMPLES[k]; let saved={};
+  try{ saved=JSON.parse(localStorage.getItem(CO_STORE)||'{}')||{}; }catch(e){}
+  if(state.company) saved[state.company]=clone(state);   // запомнить текущую компанию
+  try{ localStorage.setItem(CO_STORE, JSON.stringify(saved)); }catch(e){}
+  const s=saved[ex.company];
+  state = s && Array.isArray(s.years) && s.values ? fillFromExample(s) : clone(ex);
+  document.getElementById('company').value=state.company; innIn.value=state.inn||''; updNalog();
+  refreshAll(); status('Компания: '+state.company);
+}
+document.getElementById('coSel').addEventListener('click',e=>{ const b=e.target.closest('button[data-co]'); if(b) selectCompany(+b.dataset.co); });
 document.querySelectorAll('[data-example]').forEach(b=>b.onclick=()=>{ state=clone(EXAMPLES[+b.dataset.example]); document.getElementById('company').value=state.company; innIn.value=state.inn; updNalog(); refreshAll(); status('Загружен пример: '+state.company); });
 document.getElementById('clearAll').onclick=()=>{ state=blank(); document.getElementById('company').value=''; innIn.value=''; updNalog(); refreshAll(); status('Данные очищены'); };
 

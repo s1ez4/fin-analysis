@@ -190,3 +190,9 @@ ul.tnotes li{margin:.15rem 0}
 .frconcl h3{font-size:1rem;margin:.9rem 0 .3rem;color:#cfe0ff}
 .frconcl h3:first-child{margin-top:.2rem}
 .frconcl p{margin:.25rem 0}
+
+/* Переключатель компаний */
+.cosel{background:var(--sheet)}
+.cosel button{font-size:.88rem}
+.cosel button[aria-pressed="true"]{background:linear-gradient(135deg,rgba(110,168,255,.28),rgba(155,140,255,.22));color:var(--ink);font-weight:600;box-shadow:0 0 0 1px var(--accent) inset}
+@media (max-width:640px){.cosel{width:100%}.cosel button{flex:1;padding:.45rem .5rem}}
