@@ -447,41 +447,15 @@ function frConclusions(D, t3, t4, t5, t7){
   }
   out.push({h:'Динамика финансовых результатов', ps:dyn});
 
-  // 2. Факторы
-  const fac = [];
+  // 2–4. Факторы прибыли от продаж, чистой прибыли и модель Дюпона — те же тексты, что под таблицами 3, 5 и 7
+  const fac = [], npf = [], dp = [];
   pairs().forEach((i, k) => {
-    const F = t3.F[k]; if (!F) return;
-    const items = ['fB', 'fC', 'fKR', 'fUR'].map(key => [key, F[key]]);
-    const pos = items.filter(x => x[1] >= 1).sort((a, b) => b[1] - a[1])[0];
-    const neg = items.filter(x => x[1] <= -1).sort((a, b) => a[1] - b[1])[0];
-    let s = `Прибыль от продаж в ${Y(i)} г. изменилась на ${sgn(F.dPP)} тыс. руб. `;
-    s += pos ? `Наибольшее положительное влияние оказало ${FACTOR_NAMES[pos[0]]} (${sgn(pos[1])} тыс. руб.)` : 'Факторов с положительным влиянием не было';
-    s += neg ? `, наибольшее отрицательное — ${FACTOR_NAMES[neg[0]]} (${sgn(neg[1])} тыс. руб.).` : ', факторов с отрицательным влиянием не было.';
-    s += ` Сумма влияний (${sgn(F.sum)} тыс. руб.) совпадает с изменением прибыли от продаж.`;
-    fac.push(s);
+    if (t3.F[k]) fac.push(ppFactorText(i, t3.F[k]));
+    if (t5.F[k]) npf.push(npFactorText(i, t5.F[k]));
+    if (D[i] && D[i - 1]) dp.push(dupontText(i, t7.F[k]));
   });
   if (fac.length) out.push({h:'Влияние факторов на прибыль от продаж', ps:fac});
-
-  // 3. Факторы чистой прибыли — какой сильнее всего изменил ЧП (по модулю)
-  const npf = [];
-  pairs().forEach((i, k) => {
-    const F = t5.F[k]; if (!F) return;
-    const top = Object.keys(NP_FACTOR_NAMES).map(key => [key, F[key]]).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))[0];
-    npf.push(`Чистая прибыль в ${Y(i)} г. изменилась на ${sgn(F.dNP)} тыс. руб. Сильнее всего на нее повлияло ${NP_FACTOR_NAMES[top[0]]} (${sgn(top[1])} тыс. руб.)${top[1] >= 0 ? ' — фактор увеличил прибыль' : ' — фактор уменьшил прибыль'}. Сумма влияний совпадает с изменением чистой прибыли.`);
-  });
   if (npf.length) out.push({h:'Влияние факторов на чистую прибыль', ps:npf});
-
-  // 4. Модель Дюпона — какой фактор сильнее всего изменил ROE
-  const dp = [];
-  pairs().forEach((i, k) => {
-    if (!D[i] || !D[i - 1]) return;
-    const F = t7.F[k];
-    if (!F){ dp.push(`Разложение ROE за ${Y(i)} г. по модели Дюпона не выполнено: собственный капитал отрицательный или нет данных баланса.`); return; }
-    const items = Object.keys(DUPONT_NAMES).map(key => [key, F[key]]).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
-    const [top] = items;
-    dp.push(`ROE в ${Y(i)} г. ${F.dROE >= 0 ? 'выросла' : 'снизилась'} на ${fmtNum(Math.abs(F.dROE), 2)} п. п. Сильнее всего ROE изменил фактор «${DUPONT_NAMES[top[0]]}» (${top[1] >= 0 ? '+' : '−'}${fmtNum(Math.abs(top[1]), 2)} п. п.); влияние остальных: ` +
-      items.slice(1).map(([key, x]) => `${DUPONT_NAMES[key]} ${x >= 0 ? '+' : '−'}${fmtNum(Math.abs(x), 2)} п. п`).join(', ') + '.');
-  });
   if (dp.length) out.push({h:'Модель Дюпона', ps:dp});
 
   // 5. Рентабельность — за последний период
@@ -509,11 +483,161 @@ function frConclusions(D, t3, t4, t5, t7){
   return out;
 }
 
+/* ===================== Выводы под каждой таблицей (по правилам, без ИИ) ===================== */
+const lcFirst = s => s[0].toLowerCase() + s.slice(1);
+const P2 = x => fmtNum(x, 2);
+const growth = (x0, x1) => (x0 > 0 && x1 >= 0 ? x1 / x0 * 100 : null);
+const shareOf = (d, x) => (d.B ? x / d.B * 100 : null);
+const yearsWith = D => state.years.map((_, i) => i).filter(i => D[i]);
+const FR_NEED2 = 'Для вывода нужен отчет о финансовых результатах минимум за два года.';
+
+// Таблица 1 — динамика и структура
+function tcFr1(M){
+  const D = M.D, I = yearsWith(D); if (I.length < 2) return FR_NEED2;
+  const a = D[I[0]], b = D[I.at(-1)], y0 = Y(I[0]), y1 = Y(I.at(-1)), ps = [];
+  const gB = growth(a.B, b.B), gC = growth(a.C, b.C);
+  ps.push(`За ${y0}–${y1} гг. выручка ${b.B >= a.B ? 'увеличилась' : 'снизилась'} с ${F0(a.B)} до ${F0(b.B)} тыс. руб.${gB != null ? ` (темп роста ${F1(gB)}%)` : ''}.`);
+  if (gB != null && gC != null){
+    const s0 = shareOf(a, a.C), s1 = shareOf(b, b.C);
+    ps.push(`Себестоимость продаж росла ${gC > gB ? 'быстрее' : 'медленнее'} выручки (темп роста ${F1(gC)}% против ${F1(gB)}%), поэтому ее доля в выручке ${s1 > s0 ? 'выросла' : 'снизилась'} с ${P2(s0)}% до ${P2(s1)}%.`);
+  }
+  if (a.B && b.B){
+    const pp0 = shareOf(a, a.R['2200']), pp1 = shareOf(b, b.R['2200']), np0 = shareOf(a, a.R['2400']), np1 = shareOf(b, b.R['2400']);
+    const rub = x => fmtNum(Math.abs(x) / 100, 2) + ' руб.';
+    const tail = np0 >= 0 && np1 >= 0
+      ? `каждый рубль выручки в ${y1} г. приносит ${np1 >= np0 ? 'больше' : 'меньше'} чистой прибыли, чем в ${y0} г. (${rub(np1)} против ${rub(np0)})`
+      : np0 < 0 && np1 < 0
+        ? `убыток на каждый рубль выручки ${np1 >= np0 ? 'сократился' : 'вырос'} с ${rub(np0)} в ${y0} г. до ${rub(np1)} в ${y1} г.`
+        : np1 >= 0 ? `в ${y1} г. каждый рубль выручки приносит ${rub(np1)} чистой прибыли вместо ${rub(np0)} убытка в ${y0} г.`
+                   : `в ${y1} г. на каждый рубль выручки приходится ${rub(np1)} убытка вместо ${rub(np0)} прибыли в ${y0} г.`;
+    ps.push(`Доля прибыли от продаж в выручке изменилась с ${P2(pp0)}% до ${P2(pp1)}%, чистой прибыли — с ${P2(np0)}% до ${P2(np1)}%: ${tail}${tail.endsWith('.') ? '' : '.'}`);
+  }
+  // какая из прочих статей расходов изменилась сильнее всего
+  const items = [['коммерческие расходы', 'KR'], ['управленческие расходы', 'UR'], ['проценты к уплате', 'o2330'], ['прочие расходы', 'o2350']]
+    .map(([n, k]) => [n, a[k], b[k], b[k] - a[k]]).sort((p, q) => Math.abs(q[3]) - Math.abs(p[3]));
+  const [n, x0, x1, dx] = items[0];
+  if (Math.abs(dx) >= 1) ps.push(`Из остальных статей расходов сильнее всего изменились ${n}: ${dx > 0 ? 'рост' : 'снижение'} с ${F0(x0)} до ${F0(x1)} тыс. руб. (${sgn(dx)} тыс. руб.).`);
+  return ps.join(' ');
+}
+
+// Таблица 2 — проверка цепочки
+function tcFr2(M){
+  const D = M.D, I = yearsWith(D); if (!I.length) return 'Нет данных отчета о финансовых результатах.';
+  const bad = [];
+  for (const i of I) for (const [n, k, c] of [['валовой прибыли', 'VP', '2100'], ['прибыли от продаж', 'PP', '2200'], ['прибыли до налогообложения', 'PN', '2300']]){
+    const x = D[i][k] - D[i].R[c]; if (Math.abs(x) >= 1) bad.push(`${n} за ${Y(i)} г. (${sgn(x)} тыс. руб.)`);
+  }
+  const ps = [bad.length
+    ? `Пересчет выявил расхождения с отчетными строками: ${bad.join('; ')} — следует проверить введенные строки отчета.`
+    : `Пересчет валовой прибыли, прибыли от продаж и прибыли до налогообложения по формулам полностью совпал со строками 2100, 2200 и 2300 отчета за ${I.map(Y).join(', ')} гг. — цепочка формирования прибыли отражена в отчетности корректно.`];
+  const npDiff = I.filter(i => Math.abs(D[i].PCH - D[i].R['2400']) >= 1);
+  const by2460 = npDiff.filter(i => Math.abs(D[i].PCH - D[i].R['2400'] + D[i].P2460) < 1);
+  if (!npDiff.length) ps.push('Чистая прибыль, рассчитанная как Пнобл − 2410, совпадает с отчетной строкой 2400.');
+  else if (by2460.length === npDiff.length) ps.push(`Расхождение по чистой прибыли (${npDiff.map(i => `${Y(i)} г.: ${sgn(D[i].PCH - D[i].R['2400'])}`).join('; ')} тыс. руб.) полностью объясняется строкой 2460 «Прочее», которую формула ПЧ = Пнобл − 2410 не учитывает; с учетом этой строки расчет совпадает с отчетом.`);
+  else ps.push(`По чистой прибыли есть расхождение, не объясняемое строкой 2460 (${npDiff.filter(i => !by2460.includes(i)).map(Y).join(', ')} г.) — проверьте строки налога 2411/2412.`);
+  const L = I.at(-1), d = D[L];
+  if (d.PN > 0) ps.push(`Налог на прибыль в ${Y(L)} г. составил ${F0(d.TAX)} тыс. руб., или ${F1(d.TAX / d.PN * 100)}% прибыли до налогообложения.`);
+  return ps.join(' ');
+}
+
+// Тексты по факторам (используются и под таблицами, и в общем блоке выводов)
+function ppFactorText(i, F){
+  const items = ['fB', 'fC', 'fKR', 'fUR'].map(key => [key, F[key]]);
+  const pos = items.filter(x => x[1] >= 1).sort((a, b) => b[1] - a[1])[0];
+  const neg = items.filter(x => x[1] <= -1).sort((a, b) => a[1] - b[1])[0];
+  let s = `Прибыль от продаж в ${Y(i)} г. изменилась на ${sgn(F.dPP)} тыс. руб. `;
+  s += pos ? `Наибольшее положительное влияние оказало ${FACTOR_NAMES[pos[0]]} (${sgn(pos[1])} тыс. руб.)` : 'Факторов с положительным влиянием не было';
+  s += neg ? `, наибольшее отрицательное — ${FACTOR_NAMES[neg[0]]} (${sgn(neg[1])} тыс. руб.).` : ', факторов с отрицательным влиянием не было.';
+  return s + ` Сумма влияний (${sgn(F.sum)} тыс. руб.) совпадает с изменением прибыли от продаж.`;
+}
+function npFactorText(i, F){
+  const items = Object.keys(NP_FACTOR_NAMES).map(key => [key, F[key]]).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
+  const top = items[0];
+  const plus = items.filter(x => x[1] >= 1).map(([k, x]) => `${NP_FACTOR_NAMES[k]} (${sgn(x)})`);
+  const minus = items.filter(x => x[1] <= -1).map(([k, x]) => `${NP_FACTOR_NAMES[k]} (${sgn(x)})`);
+  return `Чистая прибыль в ${Y(i)} г. изменилась на ${sgn(F.dNP)} тыс. руб. Сильнее всего на нее повлияло ${NP_FACTOR_NAMES[top[0]]} (${sgn(top[1])} тыс. руб.). ` +
+    (plus.length ? `Увеличили прибыль (тыс. руб.): ${plus.join(', ')}. ` : 'Факторов, увеличивших прибыль, не было. ') +
+    (minus.length ? `Уменьшили прибыль (тыс. руб.): ${minus.join(', ')}.` : 'Факторов, уменьшивших прибыль, не было.') + ' Сумма влияний совпадает с изменением чистой прибыли.';
+}
+function dupontText(i, F){
+  if (!F) return `Разложение ROE за ${Y(i)} г. по модели Дюпона не выполнено: собственный капитал отрицательный или нет данных баланса.`;
+  const items = Object.keys(DUPONT_NAMES).map(key => [key, F[key]]).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
+  const pp = x => `${x >= 0 ? '+' : '−'}${fmtNum(Math.abs(x), 2)} п. п.`;
+  return `ROE в ${Y(i)} г. ${F.dROE >= 0 ? 'выросла' : 'снизилась'} на ${fmtNum(Math.abs(F.dROE), 2)} п. п. Сильнее всего ROE изменил фактор «${DUPONT_NAMES[items[0][0]]}» (${pp(items[0][1])}); влияние остальных: ` +
+    items.slice(1).map(([key, x]) => `${DUPONT_NAMES[key]} ${pp(x)}`).join(', ');
+}
+
+// Таблица 3 — факторы прибыли от продаж
+function tcFr3(M){
+  const t = M.tables[2], ps = [];
+  pairs().forEach((i, k) => { if (t.F[k]) ps.push(ppFactorText(i, t.F[k])); });
+  if (!ps.length) return 'Факторный анализ не выполнен: нужны данные минимум за два соседних года с ненулевой выручкой.';
+  const last = t.F.at(-1);
+  if (last && last.fC <= -1) ps.push('Рост доли себестоимости в выручке — ключевой резерв: возврат ее уровня к прошлому году увеличил бы прибыль от продаж на ' + F0(-last.fC) + ' тыс. руб.');
+  return ps.join(' ');
+}
+
+// Таблица 4 — рентабельность
+function tcFr4(M){
+  const D = M.D, R = M.tables[3].R, I = yearsWith(D); if (I.length < 2) return FR_NEED2;
+  const L = I.at(-1), P = I.at(-2), r0 = R[P], r1 = R[L], up = [], down = [];
+  for (const [k, name] of RENT_DEFS){
+    const x0 = r0[k], x1 = r1[k]; if (x0 == null || x1 == null) continue;
+    (x1 >= x0 ? up : down).push(`${lcFirst(name)} (${P2(x0)}% → ${P2(x1)}%)`);
+  }
+  const n = up.length + down.length, ps = [];
+  if (!down.length) ps.push(`В ${Y(L)} г. по сравнению с ${Y(P)} г. выросли все рассчитанные показатели рентабельности (${n}): ${up.join('; ')}.`);
+  else if (!up.length) ps.push(`В ${Y(L)} г. по сравнению с ${Y(P)} г. снизились все рассчитанные показатели рентабельности (${n}): ${down.join('; ')}.`);
+  else ps.push(`В ${Y(L)} г. по сравнению с ${Y(P)} г. снизились ${down.length} из ${n} показателей рентабельности: ${down.join('; ')}. Выросли: ${up.join('; ')}.`);
+  const vals = RENT_DEFS.map(([k, name]) => [name, r1[k]]).filter(x => x[1] != null).sort((a, b) => b[1] - a[1]);
+  if (vals.length > 1) ps.push(`В ${Y(L)} г. наибольшее значение у показателя «${lcFirst(vals[0][0])}» (${P2(vals[0][1])}%), наименьшее — «${lcFirst(vals.at(-1)[0])}» (${P2(vals.at(-1)[1])}%).`);
+  if (vals.some(x => x[1] < 0)) ps.push('Отрицательные значения означают, что компания работает с убытком: на каждый рубль капитала, активов или выручки приходится убыток.');
+  if (r1.roe == null && r1.K && r1.K.x != null && r1.K.x <= 0) ps.push('ROE не рассчитывается: собственный капитал отрицательный.');
+  if (I.length > 2 && R[I[0]].roa != null && r1.roa != null) ps.push(`За весь период ${Y(I[0])}–${Y(L)} гг. рентабельность активов изменилась с ${P2(R[I[0]].roa)}% до ${P2(r1.roa)}%${R[I[0]].roe != null && r1.roe != null ? `, рентабельность собственного капитала — с ${P2(R[I[0]].roe)}% до ${P2(r1.roe)}%` : ''}.`);
+  return ps.join(' ');
+}
+
+// Таблица 5 — факторы чистой прибыли
+function tcFr5(M){
+  const t = M.tables[4], ps = [];
+  pairs().forEach((i, k) => { if (t.F[k]) ps.push(npFactorText(i, t.F[k])); });
+  return ps.length ? ps.join(' ') : FR_NEED2;
+}
+
+// Таблица 6 — модель Дюпона
+function tcFr6(M){
+  const Mm = M.tables[5].M, I = state.years.map((_, i) => i).filter(i => Mm[i] && Mm[i].roe != null);
+  if (I.length < 1){
+    return Mm.some(m => m && m.negK) ? 'Модель Дюпона не рассчитывается: собственный капитал отрицательный, поэтому ROE и мультипликатор капитала не имеют экономического смысла.' : 'Модель Дюпона не рассчитана: нет данных баланса или выручки.';
+  }
+  const a = Mm[I[0]], b = Mm[I.at(-1)], y0 = Y(I[0]), y1 = Y(I.at(-1));
+  if (I.length === 1) return `В ${y1} г. ROE = ${P2(b.a)}% × ${fmtNum(b.b, 3)} × ${fmtNum(b.c, 3)} = ${P2(b.roe)}%.`;
+  const ps = [`За ${y0}–${y1} гг. рентабельность продаж по чистой прибыли ${b.a >= a.a ? 'выросла' : 'снизилась'} с ${P2(a.a)}% до ${P2(b.a)}%.`,
+    `Оборачиваемость активов ${b.b >= a.b ? 'выросла' : 'снизилась'} с ${fmtNum(a.b, 3)} до ${fmtNum(b.b, 3)} раза: каждый рубль активов в ${y1} г. приносит ${fmtNum(b.b, 2)} руб. выручки${b.b < a.b ? ' — имущество используется менее эффективно (активы растут быстрее выручки)' : ''}.`,
+    `Мультипликатор капитала ${b.c >= a.c ? 'вырос' : 'снизился'} с ${fmtNum(a.c, 3)} до ${fmtNum(b.c, 3)}: ${b.c >= a.c ? 'доля заемных средств в финансировании активов растет — это повышает ROE, но увеличивает финансовый риск' : 'компания больше опирается на собственный капитал — финансовый риск снижается'}.`,
+    `В результате ROE ${b.roe >= a.roe ? 'выросла' : 'снизилась'} с ${P2(a.roe)}% до ${P2(b.roe)}%.`];
+  return ps.join(' ');
+}
+
+// Таблица 7 — разложение ROE
+function tcFr7(M){
+  const t = M.tables[6], D = M.D, ps = [];
+  pairs().forEach((i, k) => { if (D[i] && D[i - 1]) ps.push(dupontText(i, t.F[k])); });
+  if (!ps.length) return FR_NEED2;
+  if (t.F.some(Boolean)) ps.push('Сумма влияний трех факторов совпадает с изменением ROE (строка проверки равна нулю).');
+  return ps.join(' ');
+}
+const FR_TC = {fr1:tcFr1, fr2:tcFr2, fr3:tcFr3, fr4:tcFr4, fr5:tcFr5, fr6:tcFr6, fr7:tcFr7};
+// текст вывода: свой (если правили вручную) или автоматический
+const frTcText = (id, M) => (state.conclusions[id] || '').trim() || FR_TC[id](M);
+
 /* ===================== Рендер вкладки ===================== */
 function frBuild(){
   const D = frAll();
   const t3 = frT3(D), t4 = frT4(D), t5 = frT5(D), t6 = frT6(D), t7 = frT7(D, t6);
-  return {D, tables:[frT1(D), frT2(D), t3, t4, t5, t6, t7], concl:frConclusions(D, t3, t4, t5, t7), dataNotes:frDataNotes(D)};
+  const M = {D, tables:[frT1(D), frT2(D), t3, t4, t5, t6, t7], concl:frConclusions(D, t3, t4, t5, t7), dataNotes:frDataNotes(D)};
+  M.tc = Object.fromEntries(M.tables.map(t => [t.id, frTcText(t.id, M)]));
+  return M;
 }
 // Рисунки стоят после таблиц: 1 — после таблицы 1, 2 — после таблицы 4
 const FR_FIGS = [
@@ -538,16 +662,39 @@ function renderFR(){
       <div class="scroll">${tableHTML(t)}</div>
       <p class="formula"><b>Формулы:</b> ${esc(t.formula)}</p>
       ${t.notes.length ? `<ul class="tnotes">${t.notes.map(s => `<li>${esc(s)}</li>`).join('')}</ul>` : ''}
+      <div class="concl">
+        <label class="concl-h" for="tc_${t.id}">Вывод по таблице ${t.num}</label>
+        <textarea id="tc_${t.id}" data-frid="${t.id}">${esc(M.tc[t.id])}</textarea>
+        <div class="row">
+          <button class="btn ghost small" data-frauto="${t.id}">Пересобрать вывод по цифрам</button>
+          <small data-frst="${t.id}">${(state.conclusions[t.id] || '').trim() ? 'Вывод изменен вручную.' : 'Собран автоматически по цифрам таблицы — можно дополнить своими словами.'}</small>
+        </div>
+      </div>
     </figure>${fig(t.id)}`).join('') +
     `<figure class="tbl" id="frConcl"><figcaption>Выводы и резервы роста прибыли</figcaption>
       <div class="frconcl">${M.concl.map(b => `<h3>${esc(b.h)}</h3>${b.ps.map(p => `<p>${esc(p)}</p>`).join('')}`).join('')}</div>
       <p class="formula">Текст собирается автоматически по правилам из цифр таблиц 1–7 (без нейросетей) и обновляется при изменении данных.</p>
     </figure>`;
+  box.querySelectorAll('textarea[data-frid]').forEach(autosize);
   drawFrCharts();
 }
+// Правка вывода вручную — сохраняем; кнопка возвращает автоматический текст
+document.getElementById('frOut').addEventListener('input', e => {
+  const ta = e.target.closest('textarea[data-frid]'); if (!ta) return;
+  state.conclusions[ta.dataset.frid] = ta.value; autosize(ta); save();
+  const st = document.querySelector(`[data-frst="${ta.dataset.frid}"]`); if (st) st.textContent = 'Вывод изменен вручную.';
+});
+document.getElementById('frOut').addEventListener('click', e => {
+  const b = e.target.closest('button[data-frauto]'); if (!b) return;
+  const id = b.dataset.frauto, ta = document.querySelector(`textarea[data-frid="${id}"]`);
+  if ((state.conclusions[id] || '').trim() && !confirm('Заменить ваш текст автоматическим выводом?')) return;
+  delete state.conclusions[id]; save();
+  ta.value = FR_TC[id](frBuild()); autosize(ta);
+  document.querySelector(`[data-frst="${id}"]`).textContent = 'Собран автоматически по цифрам таблицы — можно дополнить своими словами.';
+});
 
 /* ===================== Выгрузка вкладки в Excel ===================== */
-function frSheet(t){
+function frSheet(t, tc){
   const XL = window.XLSX, rows = allRows(t), grid = layout(rows, t.ncols);
   const aoa = [[`Таблица ${t.num} - ${t.title}`]], merges = [], off = 1;
   rows.forEach((row, r) => {
@@ -566,6 +713,7 @@ function frSheet(t){
   });
   aoa.push([], ['Формулы: ' + t.formula]);
   for (const s of t.notes) aoa.push([s]);
+  if (tc){ aoa.push([], ['Вывод']); for (const p of tc.split(/\n+/).filter(Boolean)) aoa.push([p]); }
   const ws = XL.utils.aoa_to_sheet(aoa); ws['!merges'] = merges;
   const pairOnly = ['fr3', 'fr5', 'fr7'].includes(t.id);   // у таблиц «по парам лет» нет колонки формулы/кода
   ws['!cols'] = [{wch:pairOnly ? 60 : 46}, ...Array(t.ncols - 1).fill(0).map((_, j) => ({wch:j === 0 && !pairOnly ? 24 : 14}))];
@@ -634,7 +782,7 @@ async function addImagesToXlsx(buf, sheetNo, pngs, row0){
 async function buildFrXlsx(){
   await loadScript(XLSX_URL); const XL = window.XLSX, wb = XL.utils.book_new(), M = frBuild();
   const names = ['1 Динамика ФР', '2 Цепочка прибыли', '3 Факторы Пп', '4 Рентабельность', '5 Факторы ЧП', '6 Модель Дюпона', '7 Разложение ROE'];
-  M.tables.forEach((t, k) => XL.utils.book_append_sheet(wb, frSheet(t), names[k]));
+  M.tables.forEach((t, k) => XL.utils.book_append_sheet(wb, frSheet(t, M.tc[t.id]), names[k]));
   const chartsWs = frChartSheet(M);
   XL.utils.book_append_sheet(wb, chartsWs, 'Графики');
   const chartSheetNo = wb.SheetNames.length;   // SheetJS нумерует листы по порядку: sheet1.xml, sheet2.xml, …
